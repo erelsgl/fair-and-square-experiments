@@ -15,7 +15,7 @@
 
 var X_RANGE = Y_RANGE = 600;
 
-var jsts = require("../jsts-extended");
+var jsts = require("../rectangles/jsts-extended");
 var factory = new jsts.geom.GeometryFactory();
 
 var pointsToString = function(points, color) {
