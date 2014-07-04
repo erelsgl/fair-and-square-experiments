@@ -13,7 +13,7 @@
 //fs.closeSync( fd );
 //console.log("starting experiments");
 
-var X_RANGE = Y_RANGE = 600;
+var X_RANGE = Y_RANGE = 400;
 
 var jsts = require("../rectangles/jsts-extended");
 var factory = new jsts.geom.GeometryFactory();
@@ -33,26 +33,28 @@ var pointsToString = function(points, color) {
 var envelope = new jsts.geom.Envelope(
 		-Infinity, // 0,//
 		Infinity,  // X_RANGE, //
-		-Infinity, // 0, // 
-		Y_RANGE);  // Infinity); // 
+		0, //
+		Infinity); // Y_RANGE);  // 
 
-var EXPERIMENT_COUNT=1;
-var POINT_COUNT=20;
+var EXPERIMENT_COUNT=100000;
+
+var POINT_COUNT=10;
+var KNOWN_SQUARE_COUNT=6;  // alert if found less than that number
+
 var ROTATED=0;
 
-var PRESET_POINTS = [
-  {x:40, y:Y_RANGE},
-  {x:200, y:Y_RANGE},
-  {x:280, y:Y_RANGE},
-  {x:320, y:Y_RANGE},
-  {x:400, y:Y_RANGE},
-  {x:560, y:Y_RANGE},
-  ];
+var PRESET_POINTS = 
+	[{x:100,y:1},
+	 {x:190,y:1},
+	 {x:200,y:1},
+	 {x:210,y:1},
+	 {x:300,y:1},
+	 ];
 var POINT_COUNT_AT_LEFT_WALL=0;  // points for which x=1.
 var POINT_COUNT_AT_BOTTOM_WALL=0;  // points for which y=1
-var KNOWN_SQUARE_COUNT=6;
+var FORCE_X_ABOVE_Y=false;
 
-var GRID_SIZE = 10;
+var GRID_SIZE = 1;
 
 
 function randomPointSnappedToGrid(maxVal, gridSize) {
@@ -62,10 +64,15 @@ function randomPointSnappedToGrid(maxVal, gridSize) {
 function randomPoints(count, xmax, ymax, gridSize) {
 	var points = PRESET_POINTS.slice(0);
 	for (var i=PRESET_POINTS.length; i<count; ++i) {
-		points.push({
-			x: i<=POINT_COUNT_AT_LEFT_WALL? 1: randomPointSnappedToGrid(xmax, gridSize),
-			y: POINT_COUNT_AT_LEFT_WALL<i&&i<=POINT_COUNT_AT_LEFT_WALL+POINT_COUNT_AT_BOTTOM_WALL? 1: randomPointSnappedToGrid(ymax, gridSize),
-		});
+		var y = POINT_COUNT_AT_LEFT_WALL<=i&&i<POINT_COUNT_AT_LEFT_WALL+POINT_COUNT_AT_BOTTOM_WALL? 1: randomPointSnappedToGrid(ymax, gridSize);
+		var x;
+		if (i<POINT_COUNT_AT_LEFT_WALL) 
+			x=1;
+		else if (FORCE_X_ABOVE_Y)
+			x=y+randomPointSnappedToGrid(xmax-y, gridSize);
+		else
+			x=randomPointSnappedToGrid(xmax, gridSize);
+		points.push({x:x,y:y});
 	}
 	points.sort(function(a,b){return a.x-b.x});
 	return points;
@@ -77,7 +84,9 @@ var proportionalCount = 0;
 var candidateCount = 0;
 for (var e=0; e<EXPERIMENT_COUNT; ++e) {
 	var points = randomPoints(POINT_COUNT,  X_RANGE, Y_RANGE, GRID_SIZE);
-	var candidates = ROTATED? factory.createRotatedSquaresTouchingPoints(points, envelope): factory.createSquaresTouchingPoints(points, envelope);
+	var candidates = ROTATED? 
+			factory.createRotatedSquaresTouchingPoints(points, envelope): 
+			factory.createSquaresTouchingPoints(points, envelope);
 	
 	candidateCount += candidates.length;
 	var disjointset = jsts.algorithm.maximumDisjointSet(candidates);
@@ -85,8 +94,8 @@ for (var e=0; e<EXPERIMENT_COUNT; ++e) {
 		proportionalCount++;
 	else {
 		if (disjointset.length < KNOWN_SQUARE_COUNT) {
-			console.log(points.length+" points, "+disjointset.length+" squares");
-			console.log("\t points="+pointsToString(points,"green"));
+			console.log(points.length+" points, "+disjointset.length+" squares, points=");
+			console.log("\t "+pointsToString(points,"green"));
 			//console.log("\t candidates="+JSON.stringify(candidates));
 		}
 	}

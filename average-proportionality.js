@@ -21,21 +21,7 @@ var maximumDisjointSet = require("../shared/maximum-disjoint-set");
 var squaresTouchingPoints = require("../shared/squares-touching-points");
 require('../shared/percent');
 
-function randomPointSnappedToGrid(maxVal, gridSize) {
-	return 	Math.floor(Math.random()*maxVal/gridSize)*gridSize;
-}
-
-function randomPoints(count, xmax, ymax, gridSize) {
-	var points =  [];
-	for (var i=0; i<count; ++i) {
-		points.push({
-			x: randomPointSnappedToGrid(xmax, gridSize),
-			y: randomPointSnappedToGrid(ymax, gridSize),
-		});
-	}
-	points.sort(function(a,b){return a.x-b.x});
-	return points;
-}
+var randomPoints = require("./random-points");
 
 
 console.log("agents\tprop avg\ttotally prop\tavg time[ms]");
