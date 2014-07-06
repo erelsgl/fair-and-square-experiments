@@ -34,14 +34,14 @@ envelopeByOpenSides[2] = new jsts.geom.Envelope(0,Infinity, 0,Infinity);
 envelopeByOpenSides[1] = new jsts.geom.Envelope(0,X_RANGE, 0,Infinity);
 envelopeByOpenSides[0] = new jsts.geom.Envelope(0,X_RANGE, 0,Y_RANGE);
 
-var colors = ['red','green','blue','yellow','black','cyan','purple'];
+var colors = ['red','green','blue','yellow','black','cyan','purple','pink','grey','white'];
 
 var resultsFileName = "results/prop.dat";
 var resultsFile = fs.createWriteStream(resultsFileName);
 
 //console.log("open\tagents\tpoints\tmin\tmed\tavg\tmax");
 for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
-	for (var POINT_COUNT=21; POINT_COUNT<=21; POINT_COUNT+=2) {
+	for (var POINT_COUNT=31; POINT_COUNT<=31; POINT_COUNT+=2) {
 		var valuePerAgent = POINT_COUNT-1;  // each point is slightly less than 1 unit value; so 2 points are needed to get 1 unit value.
 		for (var iExperiment=0; iExperiment<EXPERIMENTS_PER_CELL; ++iExperiment) {
 			var agentsValuePoints = [];
@@ -50,8 +50,8 @@ for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
 				points.color = colors[iAgent%colors.length];
 				agentsValuePoints.push(points);
 			}
-			var inverseProportionality = [];
-			for (var OPENSIDES=1; OPENSIDES<=3; ++OPENSIDES) {
+			var minValues = [];
+			for (var OPENSIDES=4; OPENSIDES>=1; --OPENSIDES) {
 				var envelope = envelopeByOpenSides[OPENSIDES];
 				var normalizedAlgorithm = jsts.algorithm.mapOpenSidesToNormalizedAlgorithm[OPENSIDES];
 				var landplots = jsts.algorithm.runDivisionAlgorithm(
@@ -63,12 +63,21 @@ for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
 					console.dir(landplots);
 					throw new Error("Partial-proportional division not found!");
 				}
-				var invProp = landplots.minValuePerAgent? valuePerAgent/landplots.minValuePerAgent: 0;
-				inverseProportionality.push(invProp-OPENSIDES/10);
+				var minValue = landplots.minValuePerAgent||0;
+				minValues.push(minValue);
+				if ((minValues.length==2 || minValues.length==3) && minValue>minValues[minValues.length-2]) {
+					console.error((minValues.length-1)+" walls better than "+(minValues.length-2)+"?!");
+					console.error(jsts.algorithm.agentsValuePointsToString(agentsValuePoints));
+					console.dir(minValues);
+					console.dir(landplots);
+				}
 			} // end of for (var OPENSIDES
 			
-			if (_.min(inverseProportionality)>0) {
-				var data = AGENT_COUNT+"\t"+inverseProportionality.join("\t");
+			if (_.min(minValues)>0) {
+				var inverseProportionality = minValues.map(function(minValue) {
+					return valuePerAgent/minValue-OPENSIDES/10;
+				});
+				var data = AGENT_COUNT+"\t"+inverseProportionality.reverse().join("\t");
 				console.log(data);
 				resultsFile.write(data+"\n");
 			}
