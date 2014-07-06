@@ -19,8 +19,10 @@ var maxAspectRatio = 1;
 
 var jsts = require("../rectangles/jsts-extended");
 var randomPoints = require("./random-points");
+var _ = require("underscore");
 require("./percent")
 var atoll = require("atoll");
+var fs = require('fs');
 
 jsts.algorithm.FIND_DIVISION_WITH_LARGEST_MIN_VALUE = true;
 jsts.algorithm.ALLOW_SINGLE_VALUE_FUNCTION = true;
@@ -34,47 +36,55 @@ envelopeByOpenSides[0] = new jsts.geom.Envelope(0,X_RANGE, 0,Y_RANGE);
 
 var colors = ['red','green','blue','yellow','black','cyan','purple'];
 
+var resultsFileName = "results/prop.dat";
+var resultsFile = fs.createWriteStream(resultsFileName);
 
-console.log("open\tagents\tpoints\tmin\tmed\tavg\tmax");
-for (var OPENSIDES=3; OPENSIDES<=3; ++OPENSIDES) {
-	var envelope = envelopeByOpenSides[OPENSIDES];
-	var normalizedAlgorithm = jsts.algorithm.mapOpenSidesToNormalizedAlgorithm[OPENSIDES];
-	for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
-		for (var POINT_COUNT=2; POINT_COUNT<=30; POINT_COUNT+=2) {
-			var valuePerAgent = POINT_COUNT-1;  // each point is slightly less than 1 unit value; so 2 points are needed to get 1 unit value.
-			var minValues = [];
-			for (var iExperiment=0; iExperiment<EXPERIMENTS_PER_CELL; ++iExperiment) {
-				var agentsValuePoints = [];
-				for (var iAgent=0; iAgent<AGENT_COUNT; ++iAgent) {
-					var points = randomPoints(POINT_COUNT,  X_RANGE, Y_RANGE, GRID_SIZE);
-					points.color = colors[iAgent%colors.length];
-					agentsValuePoints.push(points);
-				}
-
+//console.log("open\tagents\tpoints\tmin\tmed\tavg\tmax");
+for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
+	for (var POINT_COUNT=21; POINT_COUNT<=21; POINT_COUNT+=2) {
+		var valuePerAgent = POINT_COUNT-1;  // each point is slightly less than 1 unit value; so 2 points are needed to get 1 unit value.
+		for (var iExperiment=0; iExperiment<EXPERIMENTS_PER_CELL; ++iExperiment) {
+			var agentsValuePoints = [];
+			for (var iAgent=0; iAgent<AGENT_COUNT; ++iAgent) {
+				var points = randomPoints(POINT_COUNT,  X_RANGE, Y_RANGE, GRID_SIZE);
+				points.color = colors[iAgent%colors.length];
+				agentsValuePoints.push(points);
+			}
+			var inverseProportionality = [];
+			for (var OPENSIDES=1; OPENSIDES<=3; ++OPENSIDES) {
+				var envelope = envelopeByOpenSides[OPENSIDES];
+				var normalizedAlgorithm = jsts.algorithm.mapOpenSidesToNormalizedAlgorithm[OPENSIDES];
 				var landplots = jsts.algorithm.runDivisionAlgorithm(
 						normalizedAlgorithm, jsts.Side.South,
 						valuePerAgent, agentsValuePoints, envelope, maxAspectRatio);
-				
 				if (!landplots.minValuePerAgent && valuePerAgent>=2*AGENT_COUNT-1) {
 					console.error(AGENT_COUNT+" agents, "+valuePerAgent+" valuePerAgent");
 					console.error(jsts.algorithm.agentsValuePointsToString(agentsValuePoints));
 					console.dir(landplots);
 					throw new Error("Partial-proportional division not found!");
 				}
-				minValues.push(landplots.minValuePerAgent? landplots.minValuePerAgent/valuePerAgent: 0);
-			} // end of experiments
+				var invProp = landplots.minValuePerAgent? valuePerAgent/landplots.minValuePerAgent: 0;
+				inverseProportionality.push(invProp-OPENSIDES/10);
+			} // end of for (var OPENSIDES
+			
+			if (_.min(inverseProportionality)>0) {
+				var data = AGENT_COUNT+"\t"+inverseProportionality.join("\t");
+				console.log(data);
+				resultsFile.write(data+"\n");
+			}
 
-			//console.dir(minValues)
-			var data = 
-				OPENSIDES+"\t"+
-				AGENT_COUNT+"\t"+
-				POINT_COUNT+"\t"+
-				Math.percent(atoll.min(minValues))+"\t"+
-				Math.percent(atoll.median(minValues))+"\t"+
-				Math.percent(atoll.mean(minValues))+"\t"+
-				Math.percent(atoll.max(minValues))
-				
-			console.log(data);
+//			var data = 
+//				OPENSIDES+"\t"+
+//				AGENT_COUNT+"\t"+
+//				POINT_COUNT+"\t"+
+//				Math.round(atoll.min(inverseProportionality))+"\t"+
+//				Math.round(atoll.median(inverseProportionality))+"\t"+
+//				Math.round(atoll.mean(inverseProportionality))+"\t"+
+//				Math.round(atoll.max(inverseProportionality))
+
+//			console.log(data);
 		}
 	}
 }
+
+//resultsFile.close();
