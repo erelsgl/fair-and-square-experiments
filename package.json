@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "atoll": "*",
-    "underscore": "*"
+    "underscore": "*",
+    "async": "*"
   },
   "keywords": [
     "fairness",

@@ -1,8 +1,11 @@
-var path = "data/npv_4q.asc";
+// A utility to convert a given file to a JSON file with sums of rows.
+
+var input = "data/npv_4q.asc";
+var output = "data/npv_4q.1d.json";
 
 var fs = require('fs')
 var liner = require('./liner')
-var source = fs.createReadStream(path)
+var source = fs.createReadStream(input)
 var sums = [];
 source.pipe(liner)
 liner.on('readable', function () {
@@ -20,6 +23,5 @@ liner.on('readable', function () {
      }
 })
 liner.on('end', function() {
-	console.log("lines: "+sums.length)
-	console.log("sums: "+sums)
+	fs.writeFile(output, JSON.stringify(sums));
 })
