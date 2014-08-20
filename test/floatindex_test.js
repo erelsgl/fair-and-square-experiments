@@ -6,7 +6,7 @@
  */
 
 var should = require('should');
-var floatindex = require("../floatindex");
+var floatindex = require("../lib/floatindex");
 
 describe('floatindex.sum', function() {
 	var values = [1,2,3,4];
