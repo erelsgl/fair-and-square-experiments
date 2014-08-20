@@ -3,20 +3,32 @@
  * @author Erel Segal-Halevi
  * @since 2014-08
  */
+var floatindex = require("./floatindex");
 
-var ValueFunction1D = function(values) {
+
+/**
+ *  Initialize a 1-dimensional value function based on an array of numbers.
+ *  @param values the global array of numbers.
+ *  @param from (float) start of actual value function.
+ *  @param to (float) end of actual value function.
+ */
+var ValueFunction1D = function(values,from,to) {
+	if (!from) from = 0;
+	if (!to) to = values.length;
+	
 	this.values = values;
-	this.sum = values.reduce(function(sum,x){return sum+x},0)
+	this.from = from;
+	this.to = to;
+	this.sum = floatindex.sum(values,from,to);
 }
-
-
 
 
 /*** factory methods ****/
 
-ValueFunction1D.fromValues = function(values) {
-	return new ValueFunction1D(values);
+ValueFunction1D.fromValues = function(values,from,to) {
+	return new ValueFunction1D(values, from, to);
 }
+
 
 var valuesFromFile = function(filename) {
 	var fs = require('fs')
@@ -56,18 +68,7 @@ ValueFunction1D.prototype.getCutLocation = function(proportion) {
 }
 
 ValueFunction1D.prototype.valueFunctionForSubCake = function(cutFrom,cutTo) {
-	var originalValues = this.values;
-	var newValues = [];
-	var cutFromFloor = Math.floor(cutFrom);
-	var cutToCeiling = Math.ceil(cutTo);
-	var cutFromFraction = (cutFromFloor+1-cutFrom);
-	var cutToCeilingFraction = (cutTo-cutToCeiling+1);
-	newValues.push(originalValues[cutFromFloor]*cutFromFraction);
-	for (var i=cutFromFloor+1; i<cutToCeiling-1; ++i) 
-		newValues.push(originalValues[i]);
-	if (cutToCeiling<originalValues.length)
-		newValues.push(originalValues[cutToCeiling]*cutToCeilingFraction);
-	return ValueFunction1D.fromValues(newValues);
+	return ValueFunction1D.fromValues(this.values, cutFrom, cutTo);
 }
 
 
