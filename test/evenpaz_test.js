@@ -21,6 +21,7 @@ describe('Even-Paz Algorithm', function() {
 		cakepartitions.egalitarianValue(partition).should.be.above(0.5);
 		cakepartitions.normalizedEgalitarianValue(partition).should.be.above(1);
 		cakepartitions.utilitarianValue(partition).should.be.above(1);
+		cakepartitions.largestEnvy(partition).should.equal(0);
 	})
 })
 
