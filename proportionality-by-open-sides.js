@@ -96,4 +96,5 @@ for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
 	}
 }
 
-//resultsFile.close();
+resultsFile.close();
+rungnuplot("proportionality-by-open-sides.gnuplot");
