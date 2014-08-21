@@ -17,7 +17,7 @@ describe('Even-Paz Algorithm', function() {
 		var partition = evenpaz1d([vf1,vf2]);
 		partition[0].to.should.equal(2);
 		partition[1].from.should.equal(2);
-		partition[0].getValueOfCurrentPiece().should.be.above(5);
+		partition[0].getValue().should.be.above(5);
 		cakepartitions.egalitarianValue(partition).should.be.above(0.5);
 		cakepartitions.normalizedEgalitarianValue(partition).should.be.above(1);
 		cakepartitions.utilitarianValue(partition).should.be.above(1);

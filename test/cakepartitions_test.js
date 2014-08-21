@@ -7,13 +7,18 @@
 
 var should = require('should');
 var ValueFunction1D = require("../lib/ValueFunction1D");
+var AllocatedPiece1D = require("../lib/AllocatedPiece1D");
 var cakepartitions = require("../lib/cakepartitions");
 
-// parts:
-var a1 = new ValueFunction1D([1,2,3,4],0,2);
-var a2 = new ValueFunction1D([1,2,3,4],2,4);
-var b1 = new ValueFunction1D([4,3,2,1],0,2);
-var b2 = new ValueFunction1D([4,3,2,1],2,4);
+// agents:
+var a = new ValueFunction1D([1,2,3,4]);
+var b = new ValueFunction1D([4,3,2,1]);
+
+// allocations;
+var a1 = new AllocatedPiece1D(a,0,2)
+  , a2 = new AllocatedPiece1D(a,2,4)
+  , b1 = new AllocatedPiece1D(b,0,2)
+  , b2 = new AllocatedPiece1D(b,2,4)
 
 // partitions:
 var a1a2 = [a1,a2]
