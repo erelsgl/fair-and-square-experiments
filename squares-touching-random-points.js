@@ -15,7 +15,7 @@
 
 var X_RANGE = Y_RANGE = 400;
 
-var jsts = require("../rectangles/jsts-extended");
+var jsts = require("../computational-geometry/lib");
 var factory = new jsts.geom.GeometryFactory();
 
 var pointsToString = function(points, color) {
@@ -44,11 +44,12 @@ var KNOWN_SQUARE_COUNT=6;  // alert if found less than that number
 var ROTATED=0;
 
 var PRESET_POINTS = 
-	[{x:100,y:1},
-	 {x:190,y:1},
-	 {x:200,y:1},
-	 {x:210,y:1},
-	 {x:300,y:1},
+	[{x:-5,y:1},
+	 {x:155,y:1},
+	 {x:195,y:1},
+	 {x:205,y:1},
+	 {x:245,y:1},
+	 {x:405,y:1},
 	 ];
 var POINT_COUNT_AT_LEFT_WALL=0;  // points for which x=1.
 var POINT_COUNT_AT_BOTTOM_WALL=0;  // points for which y=1
@@ -96,7 +97,6 @@ for (var e=0; e<EXPERIMENT_COUNT; ++e) {
 		if (disjointset.length < KNOWN_SQUARE_COUNT) {
 			console.log(points.length+" points, "+disjointset.length+" squares, points=");
 			console.log("\t "+pointsToString(points,"green"));
-			//console.log("\t candidates="+JSON.stringify(candidates));
 		}
 	}
 }
