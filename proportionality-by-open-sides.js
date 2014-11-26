@@ -72,7 +72,7 @@ for (var AGENT_COUNT=2; AGENT_COUNT<=10; ++AGENT_COUNT) {
 					console.dir(landplots);
 				}
 			} // end of for (var OPENSIDES
-			
+
 			if (_.min(minValues)>0) {
 				var inverseProportionality = minValues.map(function(minValue) {
 					return valuePerAgent/minValue-OPENSIDES/10;
