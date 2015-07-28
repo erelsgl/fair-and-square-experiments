@@ -1,0 +1,155 @@
+<html>
+<head>
+<meta charset='utf8' />
+<script src="jsmodules/jquery-1.11.0.min.js"></script>
+<script src="jsmodules/svg.min.js"></script>
+<script src="jsmodules/svg.draggable.min.js"></script>
+<script src="jsmodules/svg.math.js"></script>
+<script src="jsmodules/svg.export.js"></script>
+<script src="jsmodules/arg.js.v1.1.min.js"></script>
+
+<script src="PiecewiseConstantValuation.js"></script>
+
+<link rel='stylesheet' href='style.css' />
+<title>Fair Division Experiment</title>
+</head>
+<body>
+<h1>Fair Division Experiment</h1>
+
+<p>
+You and a partner are going to divide a cake. 
+
+The cake is illustrated below as a brown rectangle.
+</p>
+
+<p>
+The cake has different parts with different values. 
+
+For you, the only valuable parts are the parts covered in green.
+For your partner, the valuable parts are different and you do not know what they are.
+</p>
+
+<p>
+The cake is divided as follows:
+<ol>
+<li>You decide where to cut the cake.</li>
+<li>Your partner chooses one of the two pieces (the left or the right piece).</li>
+<li>You receive the other piece.</li>
+</ol>
+
+<p>
+Your reward depends on the value of the piece that you receive.
+Your goal is to receive as much value as possible.
+</p>
+
+<p>
+You play the game <span id='max_rounds'>5</span> rounds with the same partner. 
+Your final score is the sum of your scores in all rounds.
+</p>
+
+
+<p>
+Select a cut location by dragging the blue knife left or right. Click "Cut!" to continue:
+</p>
+
+<svg id='draw' style="background:white; border:solid #888 1px"></svg>
+
+<table id='values'>
+<tbody>
+<tr>
+<th style='text-align:left'>Value of left piece:</th>
+<th style='text-align:right'>Value of right piece:</th>
+</tr>
+<tr>
+<td id='leftval' style='text-align:left'></td>
+<td id='rightval' style='text-align:right'></td>
+</tr>
+<tr>
+<td colspan='2' style='text-align:center'>
+<button id='cut'>Cut!</button>
+</td>
+</tbody>
+</table>
+
+
+<script type='text/javascript'>$(document).ready(function() {
+	var CANVAS_LENGTH = 600, CANVAS_HEIGHT = 150;
+	$("table#values").css("width", CANVAS_LENGTH+"px");
+	
+	var MAX_ROUNDS = 5;
+	$("#max_rounds").html(MAX_ROUNDS);
+	
+	var CAKE_LENGTH = 560;
+	
+	var draw = SVG('draw');
+	draw.size(CANVAS_LENGTH,CANVAS_HEIGHT);
+	
+	var CAKE_X = 20;
+	var CAKE_Y = 100;
+	var cake  = draw.line(CAKE_X, CAKE_Y, CAKE_X+CAKE_LENGTH, CAKE_Y).stroke({width:20, color:'brown'});
+	
+	var totalScore = 0;
+	var roundIndex = 1;
+
+	var valueOfPlayer = new PiecewiseConstantValuation(
+			[
+			 {from:0, to:20},  // "from" and "to" are relative to CAKE_X
+			 {from:30, to:50},
+			 {from:100, to:120},
+			 {from:200, to:300},
+			 {from:400, to:CAKE_LENGTH-20},
+			]			
+	);
+
+	var valueOfOther = new PiecewiseConstantValuation(
+			[
+			 {from:0, to:CAKE_LENGTH},
+			]			
+	);
+	
+
+	valueOfPlayer.draw(draw, CAKE_X, CAKE_Y-10, {width:20,color:'#4f4'})
+	var knife = draw.line(200, CAKE_Y-80, 200, CAKE_Y+20).stroke({width:5, color:'blue'});
+	
+	knife.draggable({
+		  minX: cake.attr('x1')
+		  , minY: knife.attr('y1')
+		  , maxX: cake.attr('x2')
+		  , maxY: knife.attr('y2')
+		  });
+	knife.dragend = function(delta, event) {
+		var x = knife.attr('x1')-CAKE_X;
+		$("#leftval").html(valueOfPlayer.valueToLeftOf(x));
+		$("#rightval").html(valueOfPlayer.valueToRightOf(x));
+	};
+
+	knife.dragend();
+	
+	$("#cut").click(function() {
+		if (roundIndex>MAX_ROUNDS) {
+			alert("Game over! Your total score is "+totalScore)
+			return;
+		}
+
+		var x = knife.attr('x1')-CAKE_X;
+		var valueOfOtherLeft = valueOfOther.valueToLeftOf(x);
+		var valueOfOtherRight = valueOfOther.valueToRightOf(x);
+		if (valueOfOtherLeft>valueOfOtherRight) {
+			var otherPlayerPiece = "left";
+			var thisPlayerPiece = "right";
+			var score = valueOfPlayer.valueToRightOf(x);
+		} else {
+			var otherPlayerPiece = "right";
+			var thisPlayerPiece = "left";
+			var score = valueOfPlayer.valueToLeftOf(x);
+		}
+		totalScore += score;
+		alert(" The other player selected the "+otherPlayerPiece+" piece. \n You get the "+thisPlayerPiece+" piece.\n Your score in round "+roundIndex+" is: "+score+"\n Your total score is: "+totalScore)
+		roundIndex++;
+	});
+});
+</script>
+
+
+</body>
+</html>
