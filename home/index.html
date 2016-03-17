@@ -1,0 +1,216 @@
+<html dir='rtl' lang='he'>
+<head>
+<meta charset='utf8' />
+<script src="jsmodules/jquery-1.12.1.min.js"></script>
+<script src="jsmodules/arg.js.v1.1.min.js"></script>
+
+<script src="main.bundle.js"></script>
+
+<link rel='stylesheet' href='style.css' />
+<title>
+    הקצאת דירות ותשלומי איזון
+</title>
+</head>
+<body>
+    
+<p class='submit' style='float:left'>
+<input type='submit' value='חישוב'/>
+</p>
+
+<h1>
+הקצאת דירות ותשלומי איזון
+</h1>
+<p>
+    ההערכות הן באלפי ש"ח, ביחס לשווי ממוצע של דירה בפרוייקט.
+</p>
+<p>
+כל לקוח יודע 
+<b>רק את ההערכות שלו</b>
+ולא את ההערכות של אחרים.
+</p>
+
+<table id="bids" border="1">
+<tr id="apartmentTypes"><th>סוג דירה:</th></tr>
+<tr id="apartmentCounts"><th>כמות:</th></tr>
+<tr id="assessments"><th>הערכת שמאי:</th></tr>
+<tr id="payments"><th>תשלום בפועל:</th></tr>
+</table>
+
+<p class='submit'>
+<input type='submit' value='חישוב'/>
+</p>
+
+<script type='text/javascript'>$(document).ready(function() {
+MEANCOST = Arg("cost");   MEANCOST = MEANCOST? parseInt(MEANCOST): 0;
+COUNT = Arg("count");  COUNT = COUNT? parseInt(COUNT): 5;
+NOISE = Arg("noise");  NOISE = NOISE? parseInt(NOISE): 30;
+seed  = Arg("seed");   seed = seed? parseInt(seed): 1;
+
+// Random number generator from :
+//    http://stackoverflow.com/questions/521295/javascript-random-seeds
+function random() {
+    var x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+
+var apartmentTypes = [
+{
+    name: "קומות 1-5 מזרח"
+    , count: COUNT
+    , assessment: MEANCOST-70
+},
+{
+    name: "קומות 1-5 מערב"
+    , count: COUNT
+    , assessment: MEANCOST-30
+},
+{
+    name: "קומות 6-10 מזרח"
+    , count: COUNT
+    , assessment: MEANCOST+40
+},
+{
+    name: "קומות 6-10 מערב"
+    , count: COUNT
+    , assessment: MEANCOST+60
+    , isLast: true
+}
+];
+
+var total = {
+    name: "סך-הכל"
+    , count: apartmentTypes.reduce(function(memo,item) {
+        return memo + item.count;  
+      }, 0)
+    , assessment:  apartmentTypes.reduce(function(memo,item) {
+        return memo + item.count*item.assessment; 
+      }, 0)
+};
+var TOTALCOST = MEANCOST*total.count;
+
+var apartmentIndexToTypeIndex = [];
+apartmentTypes.forEach(function(type, typeIndex) {
+    for (var i=0;  i<type.count; ++i) 
+        apartmentIndexToTypeIndex.push(typeIndex);
+});
+
+/* Create table of apartments:
+apartmentTypes.forEach(function(type) {
+    $("#apartments").append(
+        "<tr><td>"+type.name+"</td><td dir='ltr'>"+type.count+"</td><td dir='ltr'>"+type.assessment+"</td></tr>"
+    );
+});
+$("#apartments").append("<tr></tr>");
+$("#apartments").append(
+    "<tr><td>"+total.name+"</td><td dir='ltr'>"+total.count+"</td><td dir='ltr'>"+total.assessment+"</td></tr>"
+);
+*/
+
+// Create table of bids:
+var trApartmentTypes = $("#bids #apartmentTypes")
+  , trApartmentCounts = $("#bids #apartmentCounts")
+  , trAssessments = $("#bids #assessments")
+  , trPayments = $("#bids #payments")
+$("#bids #apartmentTypes").append("");
+apartmentTypes.forEach(function(type) {
+    trApartmentTypes.append("<th>"+type.name+"</th>");
+    trApartmentCounts.append("<th>"+type.count+"</th>");
+    trAssessments.append("<th dir='ltr'>"+type.assessment+" &#8362;</th>");
+    trPayments.append("<th dir='ltr'>"+"?"+" &#8362;</th>");
+});
+trApartmentTypes.append("<th>"+total.name+"</th>");
+trApartmentCounts.append("<th>"+total.count+"</th>");
+trAssessments.append("<th dir='ltr'>"+total.assessment+" &#8362;</th>");
+trPayments.append("<th dir='ltr'>"+TOTALCOST+" &#8362;</th>");
+
+
+trBids = [];  // all table-rows containing the bids of the agents
+for (var agent=0; agent<total.count; ++agent) {
+    var trBid = $("<tr class='bids'><td> לקוח \#"+(1+agent)+":</td></tr>");
+    var sumOfDefaultBids = 0;
+    apartmentTypes.forEach(function(type) {
+        if (!type.isLast) {
+            var defaultBid = type.assessment + Math.round(random() * NOISE / 10)*10  - NOISE/2
+            var disabledStr = "";
+            var classStr = "class='bid'";
+        } else {
+            var defaultBid = MEANCOST*apartmentTypes.length-sumOfDefaultBids
+            var disabledStr = "readonly='readonly'";
+            var classStr = "class='bid lastbid'";
+        }
+        trBid.append(
+            "<td dir='ltr'>"+"<input "+classStr+" dir='ltr' size='3' "+disabledStr+" value='"+defaultBid+"'/>"+" &#8362;</td>"
+        );
+        sumOfDefaultBids += defaultBid;
+    });
+    $("#bids").append(trBid);
+    trBids.push(trBid);
+};
+function bidsFromTr(tr) {
+        var bid = [];
+        $("input.bid", tr).each(function(typeIndex, input) {
+            var apartmentCount = apartmentTypes[typeIndex].count;
+            for (var i=0; i<apartmentCount; ++i)
+                bid.push(parseInt($(input).val()));
+        });
+        return bid;
+}
+
+function bidsFromForm() {
+    var bids = [];
+    $("#bids tr.bids").each(function(agent, tr) {
+        bids.push(bidsFromTr(tr));
+    })
+    return bids;
+}
+
+$(".submit input").click(function() {
+    var cp = new window.CompensationProcedure();
+    var bids = bidsFromForm();
+    if (!bids)
+        throw new Error("bids not defined!")
+    window.CompensationProcedure.verifyBids(bids, TOTALCOST);
+    var allocation = cp.compute(bids, TOTALCOST);
+    
+    
+    $("td.assigned").removeClass("assigned");
+    $("td.assignment").remove();
+    allocation.forEach(function(assignment, agent) {
+        var apartmentIndex = assignment[1];
+        var payment = assignment[2];
+        var typeIndex      = apartmentIndexToTypeIndex[apartmentIndex];
+        var type = apartmentTypes[typeIndex];
+        
+        trPayments.children().eq(typeIndex+1).html(payment+"  &#8362;")
+        trBids[agent].children().eq(typeIndex+1).addClass("assigned")
+        trBids[agent].append(
+            "<td class='assignment'>"+"מקבל דירה ב"+type.name+
+            (payment >= 0? 
+               " ומשלם " + "<span dir='ltr'>"+payment+"</span>"+ "  &#8362;</td>":
+               " ומקבל " + "<span dir='ltr'>"+(-payment)+"</span>"+ "  &#8362;</td>"
+               )
+        );
+   });
+});
+
+$("input.bid").change(function() {
+    var tr = $(this).closest("tr");
+    var bids = bidsFromTr(tr);
+    
+    for (var i=0; i<apartmentTypes[apartmentTypes.length-1].count; ++i)
+        bids.pop();  // remove the bids corresponding to the last type.
+    
+    var bidsSum = bids.reduce(function(memo,bid, apartmentIndex) {
+        //console.log(typeIndex)
+        return memo + bid;
+    },0)
+    var lastBid = (TOTALCOST-bidsSum) / apartmentTypes[apartmentTypes.length-1].count
+    $(this).closest("tr").find(".lastbid").val(lastBid)
+})
+
+});</script>
+
+
+</body>
+</html>

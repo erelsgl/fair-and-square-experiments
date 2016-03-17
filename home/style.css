@@ -1,0 +1,11 @@
+td {vertical-align:top}
+
+#apartments {background: #eff}
+#apartments td {text-align: center;}
+
+#bids {background: #ffe}
+#bids input.bid {text-align: center;}
+
+.submit, .submit input {font-size: large; text-align: center}
+
+.assigned {border: solid green 3px;}  /* denotes an apartment assigned to an agent */

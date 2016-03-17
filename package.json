@@ -10,7 +10,9 @@
   "dependencies": {
     "atoll": "*",
     "underscore": "*",
-    "async": "*"
+    "async": "*",
+    "munkres-js": "*",
+    "argminmax": "*"
   },
   "devDependencies": {
 	    "mocha": ">=1.0.0",
@@ -21,5 +23,5 @@
     "cake cutting",
     "geometry"
   ],
-  "license": "LGPL"
+  "license": "BSD-3-Clause"
 }
