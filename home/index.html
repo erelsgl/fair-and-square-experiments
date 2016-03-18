@@ -25,8 +25,10 @@
 </p>
 <p>
 כל לקוח יודע 
-<b>רק את ההערכות שלו</b>
-ולא את ההערכות של אחרים.
+<b>
+    רק את ההערכות שלו ואת המחירים של כל הדירות
+</b>
+אבל לא את ההערכות של אחרים.
 </p>
 
 <table id="bids" border="1">
@@ -122,12 +124,12 @@ apartmentTypes.forEach(function(type) {
 trApartmentTypes.append("<th>"+total.name+"</th>");
 trApartmentCounts.append("<th>"+total.count+"</th>");
 trAssessments.append("<th dir='ltr'>"+total.assessment+" &#8362;</th>");
-trPayments.append("<th dir='ltr'>"+TOTALCOST+" &#8362;</th>");
+trPayments.append("<th dir='ltr' class='total'>? &#8362;</th>");
 
 
 trBids = [];  // all table-rows containing the bids of the agents
 for (var agent=0; agent<total.count; ++agent) {
-    var trBid = $("<tr class='bids'><td> לקוח \#"+(1+agent)+":</td></tr>");
+    var trBid = $("<tr class='bids hidden'><td class='agentid'> לקוח \#"+(1+agent)+":</td></tr>");
     var sumOfDefaultBids = 0;
     apartmentTypes.forEach(function(type) {
         if (!type.isLast) {
@@ -140,7 +142,10 @@ for (var agent=0; agent<total.count; ++agent) {
             var classStr = "class='bid lastbid'";
         }
         trBid.append(
-            "<td dir='ltr'>"+"<input "+classStr+" dir='ltr' size='3' "+disabledStr+" value='"+defaultBid+"'/>"+" &#8362;</td>"
+            "<td>"+
+                "<div><input dir='ltr'"+classStr+" size='3' "+disabledStr+" value='"+defaultBid+"'/>"+"&#8362;</div>" + 
+                "<div class='netgain'></div>" + 
+            "</td>"
         );
         sumOfDefaultBids += defaultBid;
     });
@@ -165,6 +170,10 @@ function bidsFromForm() {
     return bids;
 }
 
+/**
+ * When the manager clicks a submit button,
+ *      calculate and display a fair allocation.
+ */
 $(".submit input").click(function() {
     var cp = new window.CompensationProcedure();
     var bids = bidsFromForm();
@@ -176,14 +185,18 @@ $(".submit input").click(function() {
     
     $("td.assigned").removeClass("assigned");
     $("td.assignment").remove();
+    paymentsByTypeIndex = Array(apartmentTypes.length);
+    var totalPayment = 0;
     allocation.forEach(function(assignment, agent) {
         var apartmentIndex = assignment[1];
         var payment = assignment[2];
+        totalPayment+=payment;
         var typeIndex      = apartmentIndexToTypeIndex[apartmentIndex];
         var type = apartmentTypes[typeIndex];
-        
-        trPayments.children().eq(typeIndex+1).html(payment+"  &#8362;")
+
+        paymentsByTypeIndex[typeIndex] = payment;
         trBids[agent].children().eq(typeIndex+1).addClass("assigned")
+        
         trBids[agent].append(
             "<td class='assignment'>"+"מקבל דירה ב"+type.name+
             (payment >= 0? 
@@ -192,8 +205,29 @@ $(".submit input").click(function() {
                )
         );
    });
+   $("#payments .total").html("<span dir='ltr'>"+totalPayment+"</span>"+ "  &#8362;</td>");
+   
+   
+   for (var typeIndex=0; typeIndex<paymentsByTypeIndex.length; ++typeIndex) {
+       var payment = paymentsByTypeIndex[typeIndex];
+       trPayments.children().eq(typeIndex+1).html(payment+"  &#8362;");
+       for (var agent=0; agent<total.count; ++agent) {
+           var td = trBids[agent].children().eq(typeIndex+1);
+           bid = parseInt(td.find("input").val());
+           td.find(".netgain").html(
+           "שמחה: "+
+           "<span dir='ltr'>"+(bid-payment)+"</span>"
+           )
+       }
+   }
+   
 });
 
+
+/**
+ * When an agent changes its bid,
+ *    change the last bid to make sure the sum equals the total cost.
+ */
 $("input.bid").change(function() {
     var tr = $(this).closest("tr");
     var bids = bidsFromTr(tr);
@@ -208,6 +242,17 @@ $("input.bid").change(function() {
     var lastBid = (TOTALCOST-bidsSum) / apartmentTypes[apartmentTypes.length-1].count
     $(this).closest("tr").find(".lastbid").val(lastBid)
 })
+
+
+/**
+ * When the manager clicks an agent's bids' row,
+ *    make this agent "active" and hide the other agents' bids.
+ */
+$("tr.bids").click(function() {
+    $(".active").closest("tr").removeClass("active").addClass("hidden");
+    $(this).closest("tr").removeClass("hidden").addClass("active");
+})
+
 
 });</script>
 

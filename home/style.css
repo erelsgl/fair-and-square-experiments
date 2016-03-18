@@ -1,11 +1,13 @@
 td {vertical-align:top}
 
-#apartments {background: #eff}
-#apartments td {text-align: center;}
-
+#bids th {color: blue}
 #bids {background: #ffe}
 #bids input.bid {text-align: center;}
 
 .submit, .submit input {font-size: large; text-align: center}
+#bids .netgain {text-align: center}
 
-.assigned {border: solid green 3px;}  /* denotes an apartment assigned to an agent */
+#bids .assigned {border: solid green 3px;}  /* denotes an apartment assigned to an agent */
+
+#bids .active, #bids .active input {color: #000}  /* denots the bids of the active agents */
+#bids .hidden, #bids .hidden input {color: #ccc}  /* denots the bids of the "other" (non-active) agents */
