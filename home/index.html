@@ -46,7 +46,8 @@
 MEANCOST = Arg("cost", 0);
 COUNT = Arg("count",5);
 NOISE = Arg("noise",50);
-ALGORITHM = Arg("alg", 2);       // 1=equal discount, 2=average discount
+ALGORITHM = Arg("alg", 1);       // 1=equal discount, 2=average discount
+    // algorithm 2 is problematic because of rounding errors! There might be envy!
 VERIFY_ENVY = Arg("verifyEnvy", false);
 seed  = Arg("seed",2);
 
