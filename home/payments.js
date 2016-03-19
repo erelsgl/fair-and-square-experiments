@@ -69,11 +69,16 @@ PC.prototype.divideSurplusEqually = function(surplus) {
         this.incPaymentOfAgent(agent, -discountPerAgent);
 }
 
-PC.prototype.divideSurplusByVector = function(discountVector) {
-    for (var agent=0; agent<this.count; ++agent) {
-        var discountPerAgent = discountVector[agent];
-        this.incPaymentOfAgent(agent, -discountPerAgent);
-    }
+PC.prototype.divideSurplusByVector = function(discountByAgent) {
+    discountByAgent.forEach(function(discountPerAgent,agent) {
+        this.incPaymentOfAgent(agent, -discountPerAgent)
+    },this)
+}
+
+PC.prototype.setPaymentsByVector = function(paymentByAgent) {
+    paymentByAgent.forEach(function(paymentPerAgent,agent) {
+        this.setPaymentOfAgent(agent, paymentPerAgent)
+    },this)
 }
 
 PC.prototype.grossValue = function(agent,item) {
@@ -109,5 +114,6 @@ if (typeof require != 'undefined' &&
     [0,10,-10]
     ];
     var pc = new PC([0,2,1],[0,2,1],bids);
+    console.dir(pc.clone());
 }
 

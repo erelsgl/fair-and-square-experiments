@@ -2,7 +2,7 @@
 <head>
 <meta charset='utf8' />
 <script src="jsmodules/jquery-1.12.1.min.js"></script>
-<script src="jsmodules/arg.js.v1.1.min.js"></script>
+<script src="jsmodules/arg.js.v1.1.min.js"></script> <!-- https://github.com/stretchr/arg.js -->
 
 <script src="main.bundle.js"></script>
 
@@ -12,14 +12,14 @@
 </title>
 </head>
 <body>
-    
-<p class='submit' style='float:left'>
-<input type='submit' value='חישוב'/>
-</p>
 
 <h1>
 הקצאת דירות ותשלומי איזון
 </h1>
+   
+<p class='submit' style='float:left'>
+<input type='submit' value='חישוב'/>
+</p>
 <p>
     ההערכות הן באלפי ש"ח, ביחס לשווי ממוצע של דירה בפרוייקט.
 </p>
@@ -31,7 +31,7 @@
 אבל לא את ההערכות של אחרים.
 </p>
 
-<table id="bids" border="1">
+<table width='100%' id="bids" border="1">
 <tr id="apartmentTypes"><th>סוג דירה:</th></tr>
 <tr id="apartmentCounts"><th>כמות:</th></tr>
 <tr id="assessments"><th>הערכת שמאי:</th></tr>
@@ -43,10 +43,12 @@
 </p>
 
 <script type='text/javascript'>$(document).ready(function() {
-MEANCOST = Arg("cost");   MEANCOST = MEANCOST? parseInt(MEANCOST): 0;
-COUNT = Arg("count");  COUNT = COUNT? parseInt(COUNT): 5;
-NOISE = Arg("noise");  NOISE = NOISE? parseInt(NOISE): 30;
-seed  = Arg("seed");   seed = seed? parseInt(seed): 1;
+MEANCOST = Arg("cost", 0);
+COUNT = Arg("count",5);
+NOISE = Arg("noise",50);
+ALGORITHM = Arg("alg", 2);       // 1=equal discount, 2=average discount
+VERIFY_ENVY = Arg("verifyEnvy", false);
+seed  = Arg("seed",2);
 
 // Random number generator from :
 //    http://stackoverflow.com/questions/521295/javascript-random-seeds
@@ -175,7 +177,7 @@ function bidsFromForm() {
  *      calculate and display a fair allocation.
  */
 $(".submit input").click(function() {
-    var cp = new window.CompensationProcedure();
+    var cp = new window.CompensationProcedure(ALGORITHM, VERIFY_ENVY);
     var bids = bidsFromForm();
     if (!bids)
         throw new Error("bids not defined!")
@@ -189,7 +191,7 @@ $(".submit input").click(function() {
     var totalPayment = 0;
     allocation.forEach(function(assignment, agent) {
         var apartmentIndex = assignment[1];
-        var payment = assignment[2];
+        var payment = Math.round10(assignment[2],-1);
         totalPayment+=payment;
         var typeIndex      = apartmentIndexToTypeIndex[apartmentIndex];
         var type = apartmentTypes[typeIndex];
@@ -205,7 +207,7 @@ $(".submit input").click(function() {
                )
         );
    });
-   $("#payments .total").html("<span dir='ltr'>"+totalPayment+"</span>"+ "  &#8362;</td>");
+   $("#payments .total").html("<span dir='ltr'>"+Math.round10(totalPayment)+"</span>"+ "  &#8362;</td>");
    
    
    for (var typeIndex=0; typeIndex<paymentsByTypeIndex.length; ++typeIndex) {
@@ -216,7 +218,7 @@ $(".submit input").click(function() {
            bid = parseInt(td.find("input").val());
            td.find(".netgain").html(
            "שמחה: "+
-           "<span dir='ltr'>"+(bid-payment)+"</span>"
+           "<span dir='ltr'>"+Math.round10(bid-payment,-1)+"</span>"
            )
        }
    }

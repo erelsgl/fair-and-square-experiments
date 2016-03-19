@@ -14,9 +14,25 @@ var Munkres = require("munkres-js")  // for calculating maxsum allocations
    ;
 _.mixin(require("argminmax"));  
 
-var CP = module.exports = function() {
+require("./round10") // define Math.round10
+
+/**
+ * Constructor.
+ * @algorithm    integer; should be one of the ALGORITHM_* constants below.
+ * @verifyNoEnvy boolean. If true, the "compute" function will throw an exception in case of envy (since this is a bug).
+ */
+var CP = module.exports = function(algorithmVariant, verifyNoEnvy) {
+    this.algorithmVariant = algorithmVariant;
+    this.verifyNoEnvy = verifyNoEnvy;
     this.munkres = new Munkres.Munkres();  // for calculating maxsum allocations
 }
+
+/** Algorithm variants: */
+CP.ALGORITHM = {
+    EQUAL_DISCOUNT: 1,
+    AVERAGE_DISCOUNT: 2,
+}
+
 
 /**
  * Verify that the bids of all agents are sufficiently high to cover the total cost.
@@ -29,11 +45,11 @@ var CP = module.exports = function() {
  * @throw Error if the bids of some agent sum up to less than totalCost.
  */ 
 CP.verifyBids = function(bids, totalCost) {
-    var itemCount = bids.length;  // item count is supposed to be equal to the number of agents.
+    var count = bids.length;  // item count is supposed to be equal to the number of agents.
     for (var i=0; i<bids.length; ++i) {
         var bid = bids[i];
-        if (bid.length!=itemCount)
-            throw new Error("Agent "+i+" has invalid number of bids: there are "+bid.length+" bids but the total number of items is "+itemCount);
+        if (bid.length!=count)
+            throw new Error("Agent "+i+" has invalid number of bids: there are "+bid.length+" bids but the total number of items is "+count);
         sum = bid.reduce(function(memo, num){ return memo + num; }, 0);
         if (sum<totalCost)
             throw new Error("The bids of agent "+i+" are too low! the sum is "+sum+" but should be at least "+totalCost);
@@ -47,7 +63,7 @@ CP.verifyBids = function(bids, totalCost) {
  * @return the assignments and payments (array of arrays).
  *        Each row is a triple [agent_index, item_index, payment] for a single agent.
  * 
- * @see Haake, Raith and Su (2002), page 729.
+ * @see Haake, Raith and Su (2002).
  */ 
 CP.prototype.compute = function(bids, totalCost) {
     if (!totalCost)
@@ -57,12 +73,12 @@ CP.prototype.compute = function(bids, totalCost) {
     CP.verifyBids(bids, totalCost);  
 
     this.bids = bids;
-    this.itemCount = bids.length; // item count is supposed to be equal to the number of agents.
+    this.count = bids.length; // item count is supposed to be equal to the number of agents.
 
     // 1. Calculate a maxsum (utilitarian) allocation:
     this.allocation = this.munkres.compute(Munkres.make_cost_matrix(bids));
-    this.itemByAgent = Array(this.itemCount);
-    this.agentByItem = Array(this.itemCount);
+    this.itemByAgent = Array(this.count);
+    this.agentByItem = Array(this.count);
     this.allocation.forEach(function(assignment) {
         var agent = assignment[0];
         var item  = assignment[1];
@@ -73,21 +89,21 @@ CP.prototype.compute = function(bids, totalCost) {
     // 1b. Calculate initial payments by bids:
     this.paymentCalculator = new PaymentCalculator(this.itemByAgent, this.agentByItem, bids);
     //console.log("paymentByItem:",this.paymentCalculator.paymentByItem)
-    for (var agent=0; agent<this.itemCount; ++agent) {
+    for (var agent=0; agent<this.count; ++agent) {
         var item = this.itemByAgent[agent]
         var payment = bids[agent][item];
         this.paymentCalculator.incPaymentOfAgent(agent, payment)
     }
     //console.log("paymentByItem:",this.paymentCalculator.paymentByItem)
 
-    for (var iteration=1; iteration<this.itemCount; ++iteration) {
+    for (var iteration=1; iteration<this.count; ++iteration) {
         this._calculateEnvy();       //  2. Calculate this.envies matrix and this.hasEnvy flag.
         if (!this.hasEnvy)
             break;
         this._compensateEnviousAgents();  // 3.
     } // 4. Loop; at most n-1 iterations will be needed.
     
-    if (this.hasEnvy) {
+    if (this.verifyNoEnvy && this.hasEnvy) {
         console.dir(this.envies);
         throw new Error("Envy detected after compensation!");
     }
@@ -97,21 +113,27 @@ CP.prototype.compute = function(bids, totalCost) {
         throw Error("surplus is NaN");
 
     if (surplus<0) {
-        throw new Error("Deficit! Surplus after compensations = "+surplus);
+        throw Error("Deficit! Surplus after compensations = "+surplus);
     }
     
-    //this.paymentCalculator.divideSurplusEqually(surplus);  // 5. Divide the remaining surplus equally among all agents (page 737).
-    this.paymentCalculator.divideSurplusByVector(this._averageDiscount(surplus)); // 5. Divide the remaining surplus equally among all agents (page 740).
-    
-    if (this.hasEnvy) {
-        console.dir(this.envies);
-        throw new Error("Envy detected after compensation!");
+    if (this.algorithmVariant == CP.ALGORITHM.EQUAL_DISCOUNT)
+        this.paymentCalculator.divideSurplusEqually(surplus);  // 5. Divide the remaining surplus equally among all agents (page 737).
+    else if (this.algorithmVariant == CP.ALGORITHM.AVERAGE_DISCOUNT)
+        this.paymentCalculator.setPaymentsByVector(this._averagePayment(surplus)); // 5. Divide the remaining surplus equally among all agents (page 740).
+    else throw Error("Unknown algorithm variant: "+this.algorithmVariant);
+
+    if (this.verifyNoEnvy) {
+        this._calculateEnvy();       //  Validity check
+        if (this.hasEnvy) {
+            console.dir(this.envies);
+            throw Error("Envy detected after surplus division!");
+        }
     }
-   
+
     // Add final prices:
     //console.dir(this.paymentByAgent)
     this.allocation.forEach(function(assignment,agent) {
-        assignment.push(this.paymentCalculator.paymentOfAgent(agent))
+        assignment.push( this.paymentCalculator.paymentOfAgent(agent) )
     }, this)
     
     return this.allocation;
@@ -119,13 +141,11 @@ CP.prototype.compute = function(bids, totalCost) {
 
 CP.prototype._calculateEnvy = function() {
     this.hasEnvy = false;
-    this.envies = Array(this.itemCount);
-    for (var agent=0; agent<this.itemCount; ++agent) { // loop on all agents
-        var myItem = this.itemByAgent[agent];
-        var myNetValue = this.paymentCalculator.netValue(agent, myItem);
-        var myEnvies = Array(this.itemCount);
-        for (var otherAgent=0; otherAgent<this.itemCount; ++otherAgent) 
-            myEnvies[otherAgent] = this.paymentCalculator.envy(agent,otherAgent);
+    this.envies = Array(this.count);
+    for (var agent=0; agent<this.count; ++agent) { // loop on all agents
+        var myEnvies = Array(this.count);
+        for (var otherAgent=0; otherAgent<this.count; ++otherAgent) 
+            myEnvies[otherAgent] = Math.round10(this.paymentCalculator.envy(agent,otherAgent), -3);
         var myMostEnviedAgent = _.argmax(myEnvies); // the other agent that this agent envies the most
         var myMaxEnvy = myEnvies[myMostEnviedAgent];
         if (myMaxEnvy>0)
@@ -136,7 +156,6 @@ CP.prototype._calculateEnvy = function() {
             maxEnvy: myEnvies[myMostEnviedAgent]
         };
     }
-    //console.log('\nenvies');     console.dir(this.envies);
 }
 
 
@@ -153,7 +172,7 @@ CP.prototype._compensationToAgent = function(agent) {
 }
 
 CP.prototype._compensateEnviousAgents = function() {
-    for (var agent=0; agent<this.itemCount; ++agent) {
+    for (var agent=0; agent<this.count; ++agent) {
         var discount = this._compensationToAgent(agent);
         if (isNaN(discount))
             throw Error("discount is NaN for agent "+agent)
@@ -166,38 +185,36 @@ CP.prototype._compensateEnviousAgents = function() {
 /**
  * Private method: divide the remaining surplus in the "average discount" method (page 740).
  */
-CP.prototype._averageDiscount = function(surplus) {
+CP.prototype._averagePayment = function(surplus) {
     // Create an array filled with zeros: http://stackoverflow.com/a/13735425/827927
-    var averageDiscount = Array.apply(null, Array(this.itemCount)).map(Number.prototype.valueOf,0);
-    for (var favoredAgent=0; favoredAgent<this.itemCount; ++favoredAgent) {
-        var biasedDiscount = this._biasedDiscount(surplus, favoredAgent);
-        console.log("biasedDiscount[",favoredAgent,"]:",biasedDiscount)
-        for (var agent=0; agent<averageDiscount.length; ++agent)
-            averageDiscount[agent] += (biasedDiscount[agent] / this.itemCount);
+    var averagePayment = Array.apply(null, Array(this.count)).map(Number.prototype.valueOf,0);
+    for (var favoredAgent=0; favoredAgent<this.count; ++favoredAgent) {
+        var biasedPayment = this._biasedPayment(surplus, favoredAgent);
+        //console.log("biasedPayment[",favoredAgent,"]:",biasedPayment)
+        for (var agent=0; agent<averagePayment.length; ++agent)
+            averagePayment[agent] += (biasedPayment[agent] / this.count);
     }
-    console.log("averageDiscount:",averageDiscount)
-    return averageDiscount;
+    //console.log("averagePayment:",averagePayment)
+    return averagePayment;
 }
 
 /**
  * Private method: calculate a division of the remaining surplus in a way that favors one agent over the rest.
  * See algorithm in page 740.
  */ 
-CP.prototype._biasedDiscount = function(surplus, favoredAgent) {
+CP.prototype._biasedPayment = function(surplus, favoredAgent) {
     // Create an array filled with zeros: http://stackoverflow.com/a/13735425/827927
-    var discounts = Array.apply(null, Array(this.itemCount)).map(Number.prototype.valueOf,0);
     var biasedPaymentCalculator = this.paymentCalculator.clone();
 
     // Define a partition of the agents to two groups:
     //  those that have to be discounted together ("positive", D)
     //  and those that do not ("negative", I\D).
-    var agentPartition = new Bipartition(this.itemCount);  // initially all are "negative".
+    var agentPartition = new Bipartition(this.count);  // initially all are "negative".
 
     // Step (i):   set D = {i}
     agentPartition.setPositive(favoredAgent);
-   
-    for (var iteration=1; iteration<this.itemCount; ++iteration) {
-       
+    for (var iteration=1; iteration<=this.count; ++iteration) {
+
         // Step (ii):  find agents that almost-envy agents in D:
         var changed = true;
         var minDiscountPossibleWithoutEnvy = Infinity;
@@ -217,7 +234,9 @@ CP.prototype._biasedDiscount = function(surplus, favoredAgent) {
             }
         }
 
+        //console.dir(agentPartition)
         if (agentPartition.allPositive()) { // divide the remaining surplus equally:
+            //console.log("all positive; surplus:",surplus)
             biasedPaymentCalculator.divideSurplusEqually(surplus);
             break;  // end inner loop
         } else {
@@ -226,15 +245,16 @@ CP.prototype._biasedDiscount = function(surplus, favoredAgent) {
                 surplus -= minDiscountPossibleWithoutEnvy;
             }
         }
-    } // loop; at most n-1 iterations needed
+    } // loop; at most n iterations needed
+    
     return biasedPaymentCalculator.paymentsOfAgents();
 }
 
 /* This just re-creates the equal division method */
 CP.prototype._biasedDiscountStub = function(surplus, favoredAgent) {
-    var discounts = Array.apply(null, Array(this.itemCount)).map(Number.prototype.valueOf,0);
-    for (var agent=0; agent<this.itemCount; ++agent)
-        discounts[agent] =  Math.floor(surplus/this.itemCount);
+    var discounts = Array.apply(null, Array(this.count)).map(Number.prototype.valueOf,0);
+    for (var agent=0; agent<this.count; ++agent)
+        discounts[agent] =  Math.floor(surplus/this.count);
     return discounts;
 }
 
@@ -286,7 +306,10 @@ if (typeof require != 'undefined' &&
     typeof module != 'undefined' &&
     require.main == module) {
 
-    var cp = new CP();
+    var cp = new CP(CP.ALGORITHM.AVERAGE_DISCOUNT, /* verify no envy = */true);
+    // test a single agent with positive payment; should return [[0,0,0]]
+    console.log("Single agent: ",cp.compute([[20]], 0));
+    
     var bids = [
     [20,-10,-10],
     [10,0,-10],
