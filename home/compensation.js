@@ -21,9 +21,10 @@ require("./round10") // define Math.round10
  * @algorithm    integer; should be one of the ALGORITHM_* constants below.
  * @verifyNoEnvy boolean. If true, the "compute" function will throw an exception in case of envy (since this is a bug).
  */
-var CP = module.exports = function(algorithmVariant, verifyNoEnvy) {
+var CP = module.exports = function(algorithmVariant, verifyNoEnvy, verifyNoDeficit) {
     this.algorithmVariant = algorithmVariant;
     this.verifyNoEnvy = verifyNoEnvy;
+    this.verifyNoDeficit = verifyNoDeficit;
     this.munkres = new Munkres.Munkres();  // for calculating maxsum allocations
 }
 
@@ -45,11 +46,12 @@ CP.ALGORITHM = {
  * @throw Error if the bids of some agent sum up to less than totalCost.
  */ 
 CP.verifyBids = function(bids, totalCost) {
-    var count = bids.length;  // item count is supposed to be equal to the number of agents.
+    var agentCount = bids.length;
+    var expectedItemCount = agentCount;
     for (var i=0; i<bids.length; ++i) {
         var bid = bids[i];
-        if (bid.length!=count)
-            throw new Error("Agent "+i+" has invalid number of bids: there are "+bid.length+" bids but the total number of items is "+count);
+        if (bid.length!=expectedItemCount)
+            throw new Error("Agent "+i+" has invalid number of bids: there are "+bid.length+" bids but the total number of items is "+expectedItemCount);
         sum = bid.reduce(function(memo, num){ return memo + num; }, 0);
         if (sum<totalCost)
             throw new Error("The bids of agent "+i+" are too low! the sum is "+sum+" but should be at least "+totalCost);
@@ -60,6 +62,7 @@ CP.verifyBids = function(bids, totalCost) {
  * @param bids - a matrix (array of arrays). 
  *        Each row represents the bids of a single agent for all items.
  *        The sum of each row must at least equal the totalCost.
+ *        The number of bids in each row (=houses) must equal the number of rows (=agents).
  * @return the assignments and payments (array of arrays).
  *        Each row is a triple [agent_index, item_index, payment] for a single agent.
  * 
@@ -88,15 +91,16 @@ CP.prototype.compute = function(bids, totalCost) {
 
     // 1b. Calculate initial payments by bids:
     this.paymentCalculator = new PaymentCalculator(this.itemByAgent, this.agentByItem, bids);
-    //console.log("paymentByItem:",this.paymentCalculator.paymentByItem)
-    for (var agent=0; agent<this.count; ++agent) {
-        var item = this.itemByAgent[agent]
-        var payment = bids[agent][item];
-        this.paymentCalculator.incPaymentOfAgent(agent, payment)
+    
+    if (totalCost >= 0)  {    // agents should pay their bids to cover the total cost:
+        for (var agent=0; agent<this.count; ++agent) {
+            var item = this.itemByAgent[agent]
+            var payment = bids[agent][item];
+            this.paymentCalculator.incPaymentOfAgent(agent, payment)
+        }
     }
-    //console.log("paymentByItem:",this.paymentCalculator.paymentByItem)
 
-    for (var iteration=1; iteration<this.count; ++iteration) {
+    for (var iteration=1; iteration<=this.count; ++iteration) {
         this._calculateEnvy();       //  2. Calculate this.envies matrix and this.hasEnvy flag.
         if (!this.hasEnvy)
             break;
@@ -105,15 +109,17 @@ CP.prototype.compute = function(bids, totalCost) {
     
     if (this.verifyNoEnvy && this.hasEnvy) {
         console.dir(this.envies);
-        throw new Error("Envy detected after compensation!");
+        throw new Error("Envy detected after "+this.count+" compensations!");
     }
     
     var surplus = this.paymentCalculator.totalPayment - totalCost;
     if (isNaN(surplus))
         throw Error("surplus is NaN");
 
-    if (surplus<0) {
-        throw Error("Deficit! Surplus after compensations = "+surplus);
+    if (this.verifyNoDeficit) {
+        if (surplus<0) {
+            throw Error("Deficit! Surplus after compensations = "+surplus);
+        }
     }
     
     if (this.algorithmVariant == CP.ALGORITHM.EQUAL_DISCOUNT)
@@ -137,6 +143,79 @@ CP.prototype.compute = function(bids, totalCost) {
     }, this)
     
     return this.allocation;
+}
+
+
+
+/**
+ * Verify bids array for computeInheritance procedure.
+ * 
+ * @param bids - a matrix (array of arrays). 
+ *        Each row represents the bids of a single agent for all items.
+ *
+ * @throw Error if the number of bids of some agent is not identical to the expected number of items.
+ */ 
+CP.verifyBidsForInheritance = function(bids) {
+    var agentCount = bids.length;
+    var expectedItemCount = agentCount+1;
+    for (var i=0; i<bids.length; ++i) {
+        var bid = bids[i];
+        if (bid.length!=expectedItemCount)
+            throw new Error("Agent "+i+" has invalid number of bids: there are "+bid.length+" bids but the expected number of items is "+expectedItemCount);
+    }
+}
+
+var NORMALIZATION = 100;   // normalize wasteItem to that value
+
+CP.prototype.computeInheritanceWithGivenWasteItem = function(bids, wasteItem) {
+    // 0. Verify numbers of bids of all agents:
+    CP.verifyBidsForInheritance(bids);
+    var itemCount  = bids[0].length;
+
+    var reducedBids = bids.map(function(agentBids) {
+        var agentBidForWasteItem = agentBids[wasteItem];
+        var reducedAgentBids = [];
+        for (var item=0; item<itemCount; ++item)
+            if (item!=wasteItem)
+                reducedAgentBids.push(agentBids[item]*NORMALIZATION/agentBidForWasteItem);  // normalize wasteItem to 100
+        return reducedAgentBids;
+    })
+    //console.log(wasteItem,": ",reducedBids);
+    var allocation = this.compute(reducedBids, /*cost=*/-NORMALIZATION);
+    allocation = allocation.map(function(agentAllocation,agentIndex) {
+       var agentBids = bids[agentIndex]
+       var agentBidForWasteItem = agentBids[wasteItem];
+       if (agentAllocation[1] >= wasteItem)
+           agentAllocation[1]++;   // because wasteItem was removed
+       var agentBidForAgentItem = agentBids[agentAllocation[1]];
+       var agentShareInWasteItem = agentAllocation[2];
+       var agentNetValue = agentBidForAgentItem - (agentShareInWasteItem/NORMALIZATION*agentBidForWasteItem)
+       agentAllocation[2] = Math.round10(agentShareInWasteItem,-3)
+       agentAllocation[3] = Math.round(agentNetValue)
+       return agentAllocation;
+    })
+    return allocation;
+}
+
+/**
+ * @param bids - a matrix (array of arrays). 
+ *        Each row represents the bids of a single agent for all items.
+ *        The number of bids in each row (=houses) must equal the number of rows (=agents) plus one.
+ *
+ * Checks all options of assigining the "waste item".
+ * 
+ * @return a hash: {wasteItem => allocation}.
+ */ 
+CP.prototype.computeInheritance = function(bids) {
+    // 0. Verify numbers of bids of all agents:
+    CP.verifyBidsForInheritance(bids);
+    var itemCount  = bids[0].length;
+
+    var allocations = {};
+    for (var wasteItem = 0;  wasteItem < itemCount; wasteItem++) {
+        allocations[wasteItem] = this.computeInheritanceWithGivenWasteItem(bids,wasteItem);
+    }
+    return allocations;
 }
 
 CP.prototype._calculateEnvy = function() {
@@ -306,16 +385,21 @@ if (typeof require != 'undefined' &&
     typeof module != 'undefined' &&
     require.main == module) {
 
-    var cp = new CP(CP.ALGORITHM.AVERAGE_DISCOUNT, /* verify no envy = */true);
+    var cp = new CP(CP.ALGORITHM.EQUAL_DISCOUNT, /* verify no envy = */true, /* verify no deficit = */true);
     // test a single agent with positive payment; should return [[0,0,0]]
     console.log("Single agent: ",cp.compute([[20]], 0));
-    
+ /*   
     var bids = [
-    [20,-10,-10],
-    [10,0,-10],
-    [0,10,-10]
+    [100,120,140,160],
+    [80,60,130,170],
+    [150,170,190,130]
+    ];
+*/
+    var bids = [
+    [3,110,120],
+    [200,220,240]
     ];
     console.log("bids: ");  console.dir(bids);
-    var allocation = cp.compute(bids, /*cost=*/0);
+    var allocation = cp.computeInheritance(bids, /*cost=*/0);
     console.log("allocation: ");  console.dir(allocation);
 }

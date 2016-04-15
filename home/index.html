@@ -173,19 +173,7 @@ function bidsFromForm() {
     return bids;
 }
 
-/**
- * When the manager clicks a submit button,
- *      calculate and display a fair allocation.
- */
-$(".submit input").click(function() {
-    var cp = new window.CompensationProcedure(ALGORITHM, VERIFY_ENVY);
-    var bids = bidsFromForm();
-    if (!bids)
-        throw new Error("bids not defined!")
-    window.CompensationProcedure.verifyBids(bids, TOTALCOST);
-    var allocation = cp.compute(bids, TOTALCOST);
-    
-    
+function markAllocationInBidsTable(allocation) {
     $("td.assigned").removeClass("assigned");
     $("td.assignment").remove();
     paymentsByTypeIndex = Array(apartmentTypes.length);
@@ -209,9 +197,23 @@ $(".submit input").click(function() {
         );
    });
    $("#payments .total").html("<span dir='ltr'>"+Math.round10(totalPayment)+"</span>"+ "  &#8362;</td>");
+}
+
+/**
+ * When the manager clicks a submit button,
+ *      calculate and display a fair allocation.
+ */
+$(".submit input").click(function() {
+    var cp = new window.CompensationProcedure(ALGORITHM, VERIFY_ENVY);
+    var bids = bidsFromForm();
+    if (!bids)
+        throw new Error("bids not defined!")
+    window.CompensationProcedure.verifyBids(bids, TOTALCOST);
+    var allocation = cp.compute(bids, TOTALCOST);
+    
+    markAllocationInBidsTable(allocation)
    
-   
-   for (var typeIndex=0; typeIndex<paymentsByTypeIndex.length; ++typeIndex) {
+    for (var typeIndex=0; typeIndex<paymentsByTypeIndex.length; ++typeIndex) {
        var payment = paymentsByTypeIndex[typeIndex];
        trPayments.children().eq(typeIndex+1).html(payment+"  &#8362;");
        for (var agent=0; agent<total.count; ++agent) {

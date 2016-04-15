@@ -6,8 +6,12 @@ td {vertical-align:top; text-align:center}
 
 .submit, .submit input {font-size: large; text-align: center}
 #bids .netgain {text-align: center}
+#bids .agentShareInWasteItem {text-align: center; color:green}
 
 #bids .assigned {border: solid green 3px;}  /* denotes an apartment assigned to an agent */
 
 #bids .active, #bids .active input {color: #000}  /* denots the bids of the active agents */
 #bids .hidden, #bids .hidden input {color: #ccc}  /* denots the bids of the "other" (non-active) agents */
+
+.negativeShare {color:red}
+.overflowShare {color:#f44}

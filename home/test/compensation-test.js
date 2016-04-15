@@ -11,7 +11,7 @@ var CP = require("../compensation");
 
 for (var algorithm in CP.ALGORITHM) {
 (function(algorithm) {
-    var cp = new CP(CP.ALGORITHM[algorithm], /* verify no envy = */true);
+    var cp = new CP(CP.ALGORITHM.EQUAL_DISCOUNT, /* verify no envy = */true, /* verify no deficit = */true);
     
     describe('Compensation Procedure - algorithm '+algorithm+' - 1 agent', function() {
         it('zero value', function() {
@@ -82,6 +82,27 @@ for (var algorithm in CP.ALGORITHM) {
         it.skip('positive cost', function() {
         })
     })
+    
+    describe('Inheritance Compensation Procedure - algorithm '+algorithm+' - 1 agent', function() {
+        it('two different values', function() {
+            var bids = [[120,140]];
+            cp.computeInheritance(bids, 0).should.eql({0:[[0,1,-100, 260]],1:[[0,0,-100, 260]]})
+        })
+    })
+    
+    describe('Inheritance Compensation Procedure - algorithm '+algorithm+' - 2 agents', function() {
+        it('Both agents think that the apartments are identical', function() {
+            var bids = [[70,70,70],[130,130,130]];
+            cp.computeInheritance(bids, 0).should.eql({0:[[0,1,-50,105],[1,2,-50,195]],1:[[0,0,-50,105],[1,2,-50,195]],2:[[0,0,-50,105],[1,1,-50,195]]})
+        })
+        it('Both agents think that the apartments are different in the same ratios', function() {
+            var bids = [[100,110,120],[200,220,240]];
+            cp.computeInheritance(bids, 0).should.eql({ '0': [ [ 0, 2, -45, 165 ], [ 1, 1, -55, 330 ] ],
+              '1': [ [ 0, 2, -40, 164 ], [ 1, 0, -58.182, 328 ] ],
+              '2': [ [ 0, 1, -45, 164 ], [ 1, 0, -53.333, 328 ] ] })
+        })
+    })
+
 })(algorithm)
 } // end for algorithm
 
