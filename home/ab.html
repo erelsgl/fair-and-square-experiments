@@ -25,6 +25,7 @@
 <table width='100%' id="bids" border="1">
 <tr id="houses"><th>דירה:</th></tr>
 <tr id="isWaste"><th>דירת שאריות?:</th></tr>
+<tr id="payments"><th>תוספת מדירת שאריות:</th></tr>
 </table>
 
 <p class='submit'>
@@ -54,11 +55,14 @@ function random() {
 }
 
 // Create table of bids:
-var trHouses = $("tr#houses");
-var trIsWaste = $("tr#isWaste");
+var trHouses = $("#bids tr#houses")
+  , trIsWaste = $("#bids tr#isWaste")
+  , trPayments = $("#bids tr#payments")
+  ;
 for (var house=0; house<NUMHOUSES; ++house) {
     trHouses.append("<th>דירה "+(house+1)+"</th>");
     trIsWaste.append("<td><input type='radio' name='wasteItem' value='"+house+"' class='isWasteItem'/></td>");
+    trPayments.append("<td dir='ltr' class='agentShareInWasteItem'></td>");
 }
 trHouses.append("<th>שווי מגיע</th>");
 trHouses.append("<th>שווי בפועל</th>");
@@ -75,7 +79,7 @@ for (var agent=1; agent<=NUMAGENTS; ++agent) {
         trBid.append(
             "<td>"+
                 "<div><input dir='ltr'"+classStr+" size='3' "+disabledStr+" value='"+defaultBid+"'/>"+"&#8362;</div>" + 
-                "<div dir='ltr' class='netgain'></div>" + 
+                "<div dir='rtl' class='netgain'></div>" + 
                 "<div dir='ltr' class='agentShareInWasteItem'></div>" + 
             "</td>"
         );
@@ -106,17 +110,30 @@ function bidsFromForm() {
 }
 
 
-function markAllocationInBidsTable(wasteItem, allocation) {
+function markAllocationInBidsTable(wasteItem, allocation, bids) {
     $("td.assigned").removeClass("assigned");
     $("td.assignment").remove();
     $(".agentShareInWasteItem").text("")
+    $(".netgain").text("")
+    trPayments.find("td").text("")
     allocation.forEach(function(agentAllocation, agent) {
         var agentHouse = agentAllocation[1];
-        var agentShareInWasteItem = Math.round10(-agentAllocation[2],-1);
+        var agentShareInWasteItem = -agentAllocation[2];
         trBids[agent].children().eq(agentHouse+1).addClass("assigned")
-        trBids[agent].children().eq(wasteItem+1).find(".agentShareInWasteItem").text(agentShareInWasteItem+"%")
+        //trBids[agent].children().eq(wasteItem+1).find(".agentShareInWasteItem").text(Math.round10(agentShareInWasteItem,-1)+"%")
+        trPayments.children().eq(agentHouse+1).text(agentShareInWasteItem+"%")
         trBids[agent].find(".agentNetValue").text(agentAllocation[3])
-       
+
+       for (var otherAgent=0; otherAgent<NUMAGENTS; ++otherAgent) {
+           var otherAgentNetValue = bids[otherAgent][agentHouse] + bids[otherAgent][wasteItem]*agentShareInWasteItem/100;
+           var td = trBids[otherAgent].children().eq(agentHouse+1);
+           td.find(".netgain").html(
+           "עם תוספת: "+
+           "<span dir='ltr'>"+Math.round10(otherAgentNetValue,-1)+"</span>"+
+           " &#8362;"
+           )
+       }
+
        /* 
         trBids[agent].append(
             "<td class='assignment'>"+"מקבל דירה ב"+type.name+
@@ -143,18 +160,8 @@ function computeAllocation(){
     var wasteItem = parseInt(document.forms[0].wasteItem.value);
     window.CompensationProcedure.verifyBidsForInheritance(bids);
     var allocation = cp.computeInheritanceWithGivenWasteItem(bids, wasteItem);
-
-    /*
-    var resultsHtml = "";
-    for (wasteItem in allocations) {
-        resultsHtml += 
-            "<h3>הקצאה כשדירת השאריות היא דירה "+(parseInt(wasteItem)+1)+":</h3>\n"+
-            allocationHtml(allocations[wasteItem]); 
-    }
-    divResults.html(resultsHtml);
-    */
-    
-    markAllocationInBidsTable(wasteItem, allocation);
+   
+    markAllocationInBidsTable(wasteItem, allocation, bids);
 }
 
 $(".submit input").click(computeAllocation);
