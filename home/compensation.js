@@ -143,6 +143,7 @@ CP.prototype.compute = function(bids, totalCost, agentNames, itemNames) {
             if (this.log) this.logger.info("אין קנאה!");
             break;
         }
+        if (this.log) this.logger.info("סבב פיצויים #"+iteration);
         this._compensateEnviousAgents();  // 3.
     } // 4. Loop; at most n-1 iterations will be needed.
     
@@ -304,11 +305,11 @@ CP.prototype._calculateEnvy = function() {
 CP.prototype._compensationToAgent = function(agent) {
     var myEnvy = this.envies[agent];
     if (myEnvy.maxEnvy <= 0) { // this agent is not envious
-        if (this.log) this.logger.info("\t אדם "+(agent+1)+" לא מקנא, ולכן לא מקבל פיצוי");
+        if (this.log) this.logger.info("\t אדם "+(agent+1)+" לא מקנא");
         return 0;
     }
     if (this.envies[myEnvy.mostEnviedAgent].maxEnvy > 0) { // this agent envies an envious agent
-        if (this.log) this.logger.info("\t אדם "+(agent+1)+"מקנא באדם "+(1+myEnvy.mostEnviedAgent)+" שגם הוא מקנא, ולכן לא מקבל פיצוי בינתיים");
+        if (this.log) this.logger.info("\t אדם "+(agent+1)+" מקנא באדם "+(1+myEnvy.mostEnviedAgent)+" שגם הוא מקנא, ולכן לא מקבל פיצוי בינתיים");
         return 0;
     }
     

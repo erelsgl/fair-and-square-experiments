@@ -34,7 +34,7 @@
 </p>
 </form>
 
-<textarea id='explanations'>
+<textarea id='explanations' rows='30' cols='120'>
 </textarea>
 
 <script type='text/javascript'>$(document).ready(function() {
