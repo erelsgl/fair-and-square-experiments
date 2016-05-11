@@ -11,13 +11,14 @@
  * @param agentOfItem 1-D array.
  * @param grossValues 2-D matrix.
  */
-var PC = module.exports = function(itemByAgent, agentByItem, grossValues) {
+var PC = module.exports = function(itemByAgent, agentByItem, grossValues, logger) {
     this.itemByAgent = itemByAgent;
     this.agentByItem = agentByItem;
     this.grossValues = grossValues;
     this.count = itemByAgent.length;
     this.paymentByItem = Array.apply(null, Array(this.count)).map(Number.prototype.valueOf,0);  // fill with zeros
     this.totalPayment  = 0;
+    this.logger = logger;
 }
 
 PC.prototype.paymentOfItem = function(item) {
@@ -64,12 +65,15 @@ PC.prototype.incPaymentOfAgent = function(agent,payment) {
 PC.prototype.divideSurplusEqually = function(surplus) {
     if (isNaN(surplus))
         throw Error("surplus is NaN");
+    this.logger.info("\t העודף מחולק שווה בשווה")
     var discountPerAgent = Math.floor(surplus/this.count);
+    this.logger.info("\t כל אדם מקבל "+discountPerAgent)
     for (var agent=0; agent<this.count; ++agent) 
         this.incPaymentOfAgent(agent, -discountPerAgent);
 }
 
 PC.prototype.divideSurplusByVector = function(discountByAgent) {
+    this.logger.info("\t העודף מחולק לפי וקטור: "+discountByAgent)
     discountByAgent.forEach(function(discountPerAgent,agent) {
         this.incPaymentOfAgent(agent, -discountPerAgent)
     },this)

@@ -22,10 +22,20 @@ require("./round10") // define Math.round10
  * @algorithm    integer; should be one of the ALGORITHM_* constants below.
  * @verifyNoEnvy boolean. If true, the "compute" function will throw an exception in case of envy (since this is a bug).
  */
-var CP = module.exports = function(algorithmVariant, verifyNoEnvy, verifyNoDeficit) {
+var CP = module.exports = function(algorithmVariant, verifyNoEnvy, verifyNoDeficit, 
+    logger) {
     this.algorithmVariant = algorithmVariant;
     this.verifyNoEnvy = verifyNoEnvy;
     this.verifyNoDeficit = verifyNoDeficit;
+    if (logger) {
+        this.logger = logger;
+        this.log = true;
+    } else {
+        this.logger = {  // dummy logger
+            info: function() {}
+        };
+        this.log = false;
+    }
     this.munkres = new Munkres.Munkres();  // for calculating maxsum allocations
 }
 
@@ -59,6 +69,20 @@ CP.verifyBids = function(bids, totalCost) {
     }
 }
 
+function defaultAgentNames(count) {
+    agentNames = Array(count);
+    for (i=0; i<count; ++i)
+        agentNames[i] = "אדם "+(i+1);
+    return agentNames;
+}
+
+function defaultItemNames(count) {
+    itemNames = Array(count);
+    for (i=0; i<count; ++i)
+         itemNames[i] = "דירה "+(i+1);
+    return itemNames;
+}
+
 /**
  * @param bids - a matrix (array of arrays). 
  *        Each row represents the bids of a single agent for all items.
@@ -69,7 +93,7 @@ CP.verifyBids = function(bids, totalCost) {
  * 
  * @see Haake, Raith and Su (2002).
  */ 
-CP.prototype.compute = function(bids, totalCost) {
+CP.prototype.compute = function(bids, totalCost, agentNames, itemNames) {
     if (!totalCost)
         totalCost = 0;
 
@@ -78,7 +102,12 @@ CP.prototype.compute = function(bids, totalCost) {
 
     this.bids = bids;
     this.count = bids.length; // item count is supposed to be equal to the number of agents.
-
+    
+    if (this.log) {
+        this.logger.info(""); // space
+        this.agentNames = agentNames? agentNames: defaultAgentNames(this.count);
+        this.itemNames = itemNames? itemNames: defaultItemNames(this.count);
+    }
     // 1. Calculate a maxsum (utilitarian) allocation:
     this.allocation = this.munkres.compute(Munkres.make_cost_matrix(bids));
     this.itemByAgent = Array(this.count);
@@ -91,20 +120,30 @@ CP.prototype.compute = function(bids, totalCost) {
     },this)
 
     // 1b. Calculate initial payments by bids:
-    this.paymentCalculator = new PaymentCalculator(this.itemByAgent, this.agentByItem, bids);
+    this.paymentCalculator = new PaymentCalculator(this.itemByAgent, this.agentByItem, bids, this.logger);
     
+    if (this.log) var allocationString = "";
     if (totalCost >= 0)  {    // agents should pay their bids to cover the total cost:
         for (var agent=0; agent<this.count; ++agent) {
             var item = this.itemByAgent[agent]
             var payment = bids[agent][item];
             this.paymentCalculator.incPaymentOfAgent(agent, payment)
+            if (this.log) allocationString += "\t"+this.agentNames[agent]+" מקבל את "+this.itemNames[item]+" ומשלם "+payment+"\n"
+        }
+    } else {
+        for (var agent=0; agent<this.count; ++agent) {
+            var item = this.itemByAgent[agent]
+            if (this.log) allocationString += "\t"+this.agentNames[agent]+" מקבל את "+this.itemNames[item]+"\n"
         }
     }
+    if (this.log) this.logger.info("ההקצאה ההתחלתית היא: "+"\n"+allocationString);
 
     for (var iteration=1; iteration<=this.count; ++iteration) {
         this._calculateEnvy();       //  2. Calculate this.envies matrix and this.hasEnvy flag.
-        if (!this.hasEnvy)
+        if (!this.hasEnvy) {
+            if (this.log) this.logger.info("אין קנאה!");
             break;
+        }
         this._compensateEnviousAgents();  // 3.
     } // 4. Loop; at most n-1 iterations will be needed.
     
@@ -114,6 +153,8 @@ CP.prototype.compute = function(bids, totalCost) {
     }
     
     var surplus = this.paymentCalculator.totalPayment - totalCost;
+    if (this.log) this.logger.info("נשאר עודף של "+surplus);
+
     if (isNaN(surplus))
         throw Error("surplus is NaN");
 
@@ -122,7 +163,7 @@ CP.prototype.compute = function(bids, totalCost) {
             throw Error("Deficit! Surplus after compensations = "+surplus);
         }
     }
-    
+
     if (this.algorithmVariant == CP.ALGORITHM.EQUAL_DISCOUNT)
         this.paymentCalculator.divideSurplusEqually(surplus);  // 5. Divide the remaining surplus equally among all agents (page 737).
     else if (this.algorithmVariant == CP.ALGORITHM.AVERAGE_DISCOUNT)
@@ -168,10 +209,14 @@ CP.verifyBidsForInheritance = function(bids) {
 
 var NORMALIZATION = 100;   // normalize wasteItem to that value
 
-CP.prototype.computeInheritanceWithGivenWasteItem = function(bids, wasteItem) {
+CP.prototype.computeInheritanceWithGivenWasteItem = function(bids, wasteItem, agentNames, itemNames) {
     // 0. Verify numbers of bids of all agents:
     CP.verifyBidsForInheritance(bids);
+    var agentCount = bids.length;
     var itemCount  = bids[0].length;
+
+    if (!agentNames) agentNames = defaultAgentNames(agentCount);
+    if (!itemNames) itemNames = defaultItemNames(itemCount);
 
     var reducedBids = bids.map(function(agentBids) {
         var agentBidForWasteItem = agentBids[wasteItem];
@@ -181,8 +226,19 @@ CP.prototype.computeInheritanceWithGivenWasteItem = function(bids, wasteItem) {
                 reducedAgentBids.push(agentBids[item]*NORMALIZATION/agentBidForWasteItem);  // normalize wasteItem to 100
         return reducedAgentBids;
     })
-    //console.log(wasteItem,": ",reducedBids);
-    var allocation = this.compute(reducedBids, /*cost=*/-NORMALIZATION);
+    var roundedReducedBids = reducedBids.map(function(agentBids) {
+        var roundedAgentBids = agentBids.map(Math.round);
+        return roundedAgentBids;
+    })
+    var reducedItemNames = [];
+    for (var item=0; item<itemCount; ++item)
+        if (item!=wasteItem)
+            reducedItemNames.push(itemNames[item]);
+
+    if (this.log) this.logger.info("דירת השאריות היא "+itemNames[wasteItem]+".")
+    if (this.log) this.logger.info("הערכים המנורמלים הם: "+ JSON.stringify(roundedReducedBids))
+
+    var allocation = this.compute(reducedBids, /*cost=*/-NORMALIZATION, agentNames, reducedItemNames);
     allocation = allocation.map(function(agentAllocation,agentIndex) {
        var agentBids = bids[agentIndex]
        var agentBidForWasteItem = agentBids[wasteItem];
@@ -207,14 +263,18 @@ CP.prototype.computeInheritanceWithGivenWasteItem = function(bids, wasteItem) {
  * 
  * @return a hash: {wasteItem => allocation}.
  */ 
-CP.prototype.computeInheritance = function(bids) {
+CP.prototype.computeInheritance = function(bids, agentNames, itemNames) {
     // 0. Verify numbers of bids of all agents:
     CP.verifyBidsForInheritance(bids);
+    var agentCount = bids.length;
     var itemCount  = bids[0].length;
+
+    if (!agentNames) agentNames = defaultAgentNames(agentCount);
+    if (!itemNames) itemNames = defaultItemNames(itemCount);
 
     var allocations = {};
     for (var wasteItem = 0;  wasteItem < itemCount; wasteItem++) {
-        allocations[wasteItem] = this.computeInheritanceWithGivenWasteItem(bids,wasteItem);
+        allocations[wasteItem] = this.computeInheritanceWithGivenWasteItem(bids,wasteItem, agentNames, itemNames);
     }
     return allocations;
 }
@@ -244,10 +304,16 @@ CP.prototype._calculateEnvy = function() {
  */ 
 CP.prototype._compensationToAgent = function(agent) {
     var myEnvy = this.envies[agent];
-    if (myEnvy.maxEnvy <= 0)  // this agent is not envious
+    if (myEnvy.maxEnvy <= 0) { // this agent is not envious
+        if (this.log) this.logger.info("\t אדם "+(agent+1)+" לא מקנא, ולכן לא מקבל פיצוי");
         return 0;
-    if (this.envies[myEnvy.mostEnviedAgent].maxEnvy > 0)  // this agent envies an envious agent
+    }
+    if (this.envies[myEnvy.mostEnviedAgent].maxEnvy > 0) { // this agent envies an envious agent
+        if (this.log) this.logger.info("\t אדם "+(agent+1)+"מקנא באדם "+(1+myEnvy.mostEnviedAgent)+" שגם הוא מקנא, ולכן לא מקבל פיצוי בינתיים");
         return 0;
+    }
+    
+    if (this.log) this.logger.info("\t אדם "+(agent+1)+" מקנא באדם "+(1+myEnvy.mostEnviedAgent)+", ולכן מקבל פיצוי "+myEnvy.maxEnvy);
     return myEnvy.maxEnvy;
 }
 
@@ -385,22 +451,39 @@ Bipartition.prototype.allNegative = function() {
 if (typeof require != 'undefined' &&
     typeof module != 'undefined' &&
     require.main == module) {
-
-    var cp = new CP(CP.ALGORITHM.EQUAL_DISCOUNT, /* verify no envy = */true, /* verify no deficit = */true);
-    // test a single agent with positive payment; should return [[0,0,0]]
-    console.log("Single agent: ",cp.compute([[20]], 0));
- /*   
-    var bids = [
-    [100,120,140,160],
-    [80,60,130,170],
-    [150,170,190,130]
-    ];
+    
+    var logger = console;
+   
+/*
+    var winston = require("winston");
+    var logger = new (winston.Logger)({
+      transports: [
+        new (winston.transports.Console)({
+          formatter: function(options) {
+            return options.message
+          }
+        })
+      ]
+    });
 */
+
+    var cp = new CP(
+        CP.ALGORITHM.EQUAL_DISCOUNT, 
+        /* verify no envy = */true,
+        /* verify no deficit = */true, 
+        logger
+        );
+    // test a single agent with positive payment; should return [[0,0,0]]
+    
+    var bids = [[20]];
+    console.log("\nbids: ");  console.dir(bids);
+    console.log("Single agent: ",cp.compute(bids, 0));
+ 
     var bids = [
     [3,110,120],
     [200,220,240]
     ];
-    console.log("bids: ");  console.dir(bids);
+    console.log("\nbids: ");  console.dir(bids);
     var allocation = cp.computeInheritance(bids, /*cost=*/0);
     console.log("allocation: ");  console.dir(allocation);
 }
@@ -412,6 +495,8 @@ if (typeof require != 'undefined' &&
  *     or: 
       browserify main.js | uglifyjs - -m -c -o main.bundle.js
  */
+
+// The main algorithm:
 window.CompensationProcedure = require("./compensation");
 
 },{"./compensation":1}],3:[function(require,module,exports){
@@ -428,13 +513,14 @@ window.CompensationProcedure = require("./compensation");
  * @param agentOfItem 1-D array.
  * @param grossValues 2-D matrix.
  */
-var PC = module.exports = function(itemByAgent, agentByItem, grossValues) {
+var PC = module.exports = function(itemByAgent, agentByItem, grossValues, logger) {
     this.itemByAgent = itemByAgent;
     this.agentByItem = agentByItem;
     this.grossValues = grossValues;
     this.count = itemByAgent.length;
     this.paymentByItem = Array.apply(null, Array(this.count)).map(Number.prototype.valueOf,0);  // fill with zeros
     this.totalPayment  = 0;
+    this.logger = logger;
 }
 
 PC.prototype.paymentOfItem = function(item) {
@@ -481,12 +567,15 @@ PC.prototype.incPaymentOfAgent = function(agent,payment) {
 PC.prototype.divideSurplusEqually = function(surplus) {
     if (isNaN(surplus))
         throw Error("surplus is NaN");
+    this.logger.info("\t העודף מחולק שווה בשווה")
     var discountPerAgent = Math.floor(surplus/this.count);
+    this.logger.info("\t כל אדם מקבל "+discountPerAgent)
     for (var agent=0; agent<this.count; ++agent) 
         this.incPaymentOfAgent(agent, -discountPerAgent);
 }
 
 PC.prototype.divideSurplusByVector = function(discountByAgent) {
+    this.logger.info("\t העודף מחולק לפי וקטור: "+discountByAgent)
     discountByAgent.forEach(function(discountPerAgent,agent) {
         this.incPaymentOfAgent(agent, -discountPerAgent)
     },this)

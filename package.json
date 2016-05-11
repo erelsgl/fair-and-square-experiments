@@ -12,7 +12,9 @@
     "underscore": "*",
     "async": "*",
     "munkres-js": "*",
-    "argminmax": "*"
+    "argminmax": "*",
+    "winston": "*",
+    "winston-memory": "*"
   },
   "devDependencies": {
 	    "mocha": ">=1.0.0",
