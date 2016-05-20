@@ -6,6 +6,8 @@
 
 <script src="main.bundle.js"></script>
 <script src="TextareaLogger.js"></script>
+<script src="PermalinkManager.js"></script>
+<script src="RandomGenerator.js"></script>
 
 <link rel='stylesheet' href='style.css' />
 <title>
@@ -19,7 +21,7 @@
 </h1>
    
 <p class='submit'>
-<input type='submit' value='חישוב'/>
+<!-- input type='submit' value='חישוב'/ -->
 </p>
 
 <form id='bidsForm'>
@@ -31,6 +33,8 @@
 
 <p class='submit'>
 <input type='submit' value='חישוב'/>
+&nbsp; &nbsp; &nbsp;
+<a id='permalink' href=''>שמירת מצב</a>
 </p>
 </form>
 
@@ -39,22 +43,30 @@
 </textarea>
 
 <script type='text/javascript'>$(document).ready(function() {
-NUMHOUSES = Arg("houses", 4);
-NUMAGENTS = Arg("agents",3);
+var logger = new TextareaLogger('explanations');
+var permalink = new PermalinkManager('permalink');
+var random = new RandomGenerator(Arg("seed",2));
 
-NOISE = Arg("noise",50);
-ALGORITHM = Arg("alg", 1);       // 1=equal discount, 2=average discount
-VERIFY_NO_ENVY = Arg("verifyEnvy", false);
-VERIFY_NO_DEFICIT = Arg("verifyDeficit", false);
+var args = Arg.all();
 
-seed  = Arg("seed",2);
-
-// Random number generator from :
-//    http://stackoverflow.com/questions/521295/javascript-random-seeds
-function random() {
-    var x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
+var NUMHOUSES = Arg("houses", 4);
+var NUMAGENTS = Arg("agents",3);
+var NOISE = Arg("noise",50);
+var ALGORITHM = Arg("alg", 1);       // 1=equal discount, 2=average discount
+var VERIFY_NO_ENVY = Arg("verifyEnvy", false);
+var VERIFY_NO_DEFICIT = Arg("verifyDeficit", false);
+if (!args.bids) {
+    args.bids = Array(NUMAGENTS);
+    for (var agent=0; agent<NUMAGENTS; ++agent) {
+        args.bids[agent] = Array(NUMHOUSES);
+        for (var house=0; house<NUMHOUSES; ++house) {
+            var meanValue = 100;
+            var defaultBid = meanValue + Math.round(random.get() * NOISE / 10)*10  - NOISE/2
+            args.bids[agent][house] = defaultBid;
+        }
+    };
 }
+permalink.update(args);
 
 // Create table of bids:
 var trHouses = $("#bids tr#houses")
@@ -72,22 +84,19 @@ trHouses.append("<th>שווי בפועל</th>");
 trBids = [];  // all table-rows containing the bids of the agents
 for (var agent=1; agent<=NUMAGENTS; ++agent) {
     var trBid = $("<tr class='bids'><td class='agentid'> שחקן \#"+(agent)+":</td></tr>");
-    var bids = []
     for (var house=1; house<=NUMHOUSES; ++house) {
         var classStr = "class='bid'";
-        var meanValue = 100;
-        var defaultBid = meanValue + Math.round(random() * NOISE / 10)*10  - NOISE/2
         var disabledStr = "";
+        var bid = args.bids[agent-1][house-1]
         trBid.append(
             "<td>"+
-                "<div><input dir='ltr'"+classStr+" size='3' "+disabledStr+" value='"+defaultBid+"'/>"+"&#8362;</div>" + 
+                "<div><input dir='ltr'"+classStr+" size='3' "+disabledStr+" value='"+bid+"'/>"+"&#8362;</div>" + 
                 "<div dir='rtl' class='netgain'></div>" + 
                 "<div dir='ltr' class='agentShareInWasteItem'></div>" + 
             "</td>"
         );
-        bids.push(defaultBid);
     }
-    trBid.append("<td><span class='agentDueValue'>"+dueValue(bids)+"</span> &#8362;</td>");
+    trBid.append("<td><span class='agentDueValue'>"+dueValue(args.bids[agent-1])+"</span> &#8362;</td>");
     trBid.append("<td><span class='agentNetValue'></span> &#8362;</td>");
     $("#bids").append(trBid);
     trBids.push(trBid);
@@ -112,7 +121,7 @@ function bidsFromForm() {
 }
 
 
-function markAllocationInBidsTable(wasteItem, allocation, bids) {
+function markAllocationInBidsTable(wasteItem, allocation) {
     $("td.assigned").removeClass("assigned");
     $("td.assignment").remove();
     $(".agentShareInWasteItem").text("")
@@ -122,12 +131,11 @@ function markAllocationInBidsTable(wasteItem, allocation, bids) {
         var agentHouse = agentAllocation[1];
         var agentShareInWasteItem = -agentAllocation[2];
         trBids[agent].children().eq(agentHouse+1).addClass("assigned")
-        //trBids[agent].children().eq(wasteItem+1).find(".agentShareInWasteItem").text(Math.round10(agentShareInWasteItem,-1)+"%")
         trPayments.children().eq(agentHouse+1).text(agentShareInWasteItem+"%")
         trBids[agent].find(".agentNetValue").text(agentAllocation[3])
 
        for (var otherAgent=0; otherAgent<NUMAGENTS; ++otherAgent) {
-           var otherAgentNetValue = bids[otherAgent][agentHouse] + bids[otherAgent][wasteItem]*agentShareInWasteItem/100;
+           var otherAgentNetValue = args.bids[otherAgent][agentHouse] + args.bids[otherAgent][wasteItem]*agentShareInWasteItem/100;
            var td = trBids[otherAgent].children().eq(agentHouse+1);
            td.find(".netgain").html(
            "עם תוספת: "+
@@ -135,23 +143,10 @@ function markAllocationInBidsTable(wasteItem, allocation, bids) {
            " &#8362;"
            )
        }
-
-       /* 
-        trBids[agent].append(
-            "<td class='assignment'>"+"מקבל דירה ב"+type.name+
-            (payment >= 0? 
-               " ומשלם " + "<span dir='ltr'>"+payment+"</span>"+ "  &#8362;</td>":
-               " ומקבל " + "<span dir='ltr'>"+(-payment)+"</span>"+ "  &#8362;</td>"
-               )
-        );
-        */
    });
 }
 
 
-
-var logger = new TextareaLogger("#explanations");
-//var logger = console;
 var compensationCalculator = new window.CompensationProcedure(ALGORITHM, VERIFY_NO_ENVY, VERIFY_NO_DEFICIT, logger);
 
 /**
@@ -160,14 +155,11 @@ var compensationCalculator = new window.CompensationProcedure(ALGORITHM, VERIFY_
  */
 function computeAllocation(){
     logger.clean();
-    var bids = bidsFromForm();
-    if (!bids)
-        throw new Error("bids not defined!")
     var wasteItem = parseInt(document.forms[0].wasteItem.value);
-    window.CompensationProcedure.verifyBidsForInheritance(bids);
-    var allocation = compensationCalculator.computeInheritanceWithGivenWasteItem(bids, wasteItem);
+    window.CompensationProcedure.verifyBidsForInheritance(args.bids);
+    var allocation = compensationCalculator.computeInheritanceWithGivenWasteItem(args.bids, wasteItem);
    
-    markAllocationInBidsTable(wasteItem, allocation, bids);
+    markAllocationInBidsTable(wasteItem, allocation);
 }
 
 $(".submit input").click(computeAllocation);
@@ -194,8 +186,8 @@ function allocationHtml(allocation) {
     return html;
 }
 
-function dueValue(bids) {
-    var bidsSum = bids.reduce(function(memo,bid) {
+function dueValue(bidsOfAgent) {
+    var bidsSum = bidsOfAgent.reduce(function(memo,bid) {
         return memo + bid;
     },0)
     return Math.round(bidsSum / NUMAGENTS);
@@ -203,8 +195,11 @@ function dueValue(bids) {
 
 $("input.bid").change(function() {
     var tr = $(this).closest("tr");
-    var bids = bidsFromTr(tr);
-    tr.find(".agentDueValue").text(dueValue(bids))
+    var bidsOfAgent = bidsFromTr(tr);
+    tr.find(".agentDueValue").text(dueValue(bidsOfAgent));
+    
+    args.bids = bidsFromForm();
+    permalink.update(args);
 })
 
 $("input[name=wasteItem]").click(function(){
