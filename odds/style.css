@@ -4,8 +4,10 @@ body {font-size: 20px}
 	#intro img {height:30px}
 	#deal img {height: 30px}
 
-#stats #gainsDiv {border: 1px solid black; padding: 2px; width: 200px; float:right; text-align:center}
-#stats #roundCountDiv {border: 1px solid black; padding: 2px; width: 200px; float:left; text-align:center}
+#stats td {width: 200px; text-align:center; padding: 2px; font-size:20px}
+#stats #gainsDiv {border: 1px solid black}
+#stats #roundCountDiv {border: 1px solid black}
+#stats #dealDiv {}
 
 #game {width: 600px; }
 	#game #prompt {text-align:center}

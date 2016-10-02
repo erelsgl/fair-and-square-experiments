@@ -37,12 +37,14 @@ The rules are simple:
 <button id='start'>Click here to start!</button>
 </div><!-- intro -->
 
-<div id='stats'>
-	<div class='stats' id='gainsDiv'>Your gains: $<span id='gains'>0</span></div>
-	<div class='stats' id='roundCountDiv'>Game #<span id='roundCount'>1</span></div>
-	<br style='clear:all'/>
-	<br/>
-</div>
+<table id='stats'>
+<tr>
+	<td><div class='stats' id='roundCountDiv'>Game #<span id='roundCount'>1</span></div></td>
+	<td><div class='stats' id='dealDiv'>-</div></td>
+	<td><div class='stats' id='gainsDiv'>Your gains: $<span id='gains'>0</span></div></td>
+</tr>
+</table><!-- stats -->
+<br/>
 
 <div class='page' id='game'>
 	<div id='prompt'>
@@ -178,6 +180,9 @@ The rules are simple:
 		$("#game #outcome").show()
 
 		incGain(gain)
+
+		if (deal && humanChoice!=1)  // the human breaks the deal!
+			setNoDeal()
 	}
 
 	function incGain(inc) {
@@ -213,13 +218,23 @@ The rules are simple:
 		}
 	})
 
-	$("#dealYes").click(function() {
+	function setDeal() {
 		deal = true
+		$("#dealDiv").html("<span style='color:green'>Deal</span>")
+	}
+
+	function setNoDeal() {
+		deal = false
+		$("#dealDiv").html("<span style='color:red'>No Deal</span>")
+	}
+
+	$("#dealYes").click(function() {
+		setDeal()
 		startRealGame()
 	})
 
 	$("#dealNo").click(function() {
-		deal = false
+		setNoDeal()
 		startRealGame()
 	})
 
