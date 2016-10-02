@@ -1,0 +1,17 @@
+body {font-size: 20px}
+
+#intro {}
+	#intro img {height:30px}
+	#deal img {height: 30px}
+
+#stats #gainsDiv {border: 1px solid black; padding: 2px; width: 200px; float:right; text-align:center}
+#stats #roundCountDiv {border: 1px solid black; padding: 2px; width: 200px; float:left; text-align:center}
+
+#game {width: 600px; }
+	#game #prompt {text-align:center}
+	#game #human  {margin-top: 2em}
+		#game img {height:100px; margin:20px; vertical-align:middle}
+			#game #prompt img {opacity:0.5}
+				#game #prompt img:hover {opacity:1}
+			#game #humanChoice    img {border: green solid 2px}
+			#game #computerChoice img {border: red solid 2px}
