@@ -1,0 +1,232 @@
+<html>
+<head>
+<meta charset='utf8' />
+<script src="jsmodules/jquery-1.11.0.min.js"></script>
+<script src="jsmodules/arg.js.v1.1.min.js"></script>
+
+<script src="PiecewiseConstantValuation.js"></script>
+
+<link rel='stylesheet' href='style.css' />
+<title>Odds-and-Evens Experiment</title>
+
+</head>
+<body>
+<h1>Odds-and-Evens Game</h1>
+
+<div class='page' id='intro'>
+You will play the game of <b>Odds and Evens</b> against the computer.
+<p>
+The rules are simple:
+<ul>
+	<li>You and the computer simultaneously show
+		<br/>	either <b>one finger <img src='finger1.png'/></b>
+			or <b>two fingers <img src='finger2.png'/></b>.
+	</li>
+	<li>If both of you show the <b>same</b> number of fingers
+		<!-- (<img src='finger1.png'/><img src='finger1.png'/> or <img src='finger2.png'/><img src='finger2.png'/>)-->
+		, you win <b>$1</b>.</li>
+	<li>If you choose <b>different</b> numbers
+		<!-- (<img src='finger1.png'/><img src='finger2.png'/> or <img src='finger2.png'/><img src='finger1.png'/>)-->
+		, you win <b>nothing</b>.</li>
+</ul>
+
+<div style='display:none'>
+	There will be <span id='maxRounds'>4</span> rounds.
+</div>
+
+<button id='start'>Click here to start!</button>
+</div><!-- intro -->
+
+<div id='stats'>
+	<div class='stats' id='gainsDiv'>Your gains: $<span id='gains'>0</span></div>
+	<div class='stats' id='roundCountDiv'>Game #<span id='roundCount'>1</span></div>
+	<br style='clear:all'/>
+	<br/>
+</div>
+
+<div class='page' id='game'>
+	<div id='prompt'>
+		Show
+			<img src='finger1.png' class='finger1'/>
+			or
+			<img src='finger2.png' class='finger2'/>?
+	</div><!-- prompt -->
+
+	<div id='outcome'>
+		<p>You show <span id='humanChoice'></span>.
+			 Computer shows <span id='computerChoice'></span>.</p>
+		<p><span id='winner'>X wins!</span> <button id='next'>Click here for continue.</button>
+		</p>
+	</div><!-- outcome -->
+
+
+	<div id='computer'>
+	</div><!-- computer -->
+
+</div><!-- game -->
+
+<div class='page' id='deal'>
+	<p>From now on, the game will continue indefinitely,
+		and there will be a chance of
+		<b><span id="stopPercent">1</span>%</b> that the game ends in each round.
+	</p>
+
+	<p>
+	The computer offers to you the following deal:
+	<ul>
+		<li>"You will always show <b>one</b> finger: <img src='finger1.png'/>.</li>
+		<li>I will show 4 times <img src='finger1.png'/>, then 5 times <img src='finger2.png'/>, then 4 times <img src='finger1.png'/>, then 5 times <img src='finger2.png'/>, and so on.</li>
+		<li>This will guarantee that you always win in exactly 4 rounds out of 9.</li>
+		<li>If you do not agree to the deal, I will play randomly.</li>
+		<li>If you do do not follow your part in the deal, I will play randomly too."</li>
+	</ul>
+</p>
+<p>
+	Do you agree to the deal?
+	<button id='dealYes'>Yes</button>
+	<button id='dealNo'>No</button>
+</p>
+</div>
+
+
+<div class='page' id='end'>
+	<p>Game over!
+
+	<p>Thank you for playing.
+</div>
+
+<script type='text/javascript'>$(document).ready(function() {
+		var gainsSpan = $("#gains")
+		  , gains = 0
+			, roundCountSpan = $("#roundCount")
+			, roundCount = 1
+			, maxRounds = parseInt($("#maxRounds").text())
+			, stopProb = parseFloat($("#stopPercent").text())*0.01
+			, deal = false
+			, stepInDeal = -1   // increments to 0
+			, tutorial = true
+					// in the tutorial game, the stop condition is playing maxRounds rounds.
+					// in the real game,     the stop condition is a coin-toss with probability stopProb.
+
+	if (Arg("game"))
+		startTutorialGame()
+	else if (Arg("deal"))
+		startDeal()
+	else
+	  startIntro()
+
+	function startIntro() {
+		$(".page").hide();  $("#stats").hide();  $("#intro").show()
+	}
+
+	function startTutorialGame() {
+		tutorial = true
+		$(".page").hide();   $("#stats").show();   $("#game").show()
+		$("#game #prompt").show(); 		$("#game #outcome").hide()
+		gains = 0;   	gainsSpan.html(gains)
+	}
+
+	function startRealGame() {
+		tutorial = false
+		$(".page").hide();   $("#game").show()
+		$("#game #prompt").show(); 		$("#game #outcome").hide()
+	}
+
+	function startDeal() {
+		$(".page").hide();   $("#stats").show();    $("#deal").show()
+	}
+
+	$("#intro button#start").click(function() {
+		startTutorialGame()
+	})
+
+	$("#prompt .finger1").click(function() {
+		humanPlays(1)
+	})
+
+	$("#prompt .finger2").click(function() {
+		humanPlays(2)
+	})
+
+	function getComputerChoice() {
+		if (!deal)
+			return Math.random()>0.5? 2: 1
+
+		stepInDeal = (stepInDeal + 1) % 9
+		if (stepInDeal < 4)  // steps 0, 1, 2, 3
+			return 1
+		else                 // steps 4, 5, 6, 7, 8
+			return 2
+	}
+
+	function humanPlays(humanChoice) {
+		$("#game #humanChoice").html("<img src='finger"+humanChoice+".png'/>")
+		var computerChoice = getComputerChoice()
+		$("#game #computerChoice").html("<img src='finger"+computerChoice+".png'/>")
+		var winner, gain
+		if (humanChoice==computerChoice)  { // human wins
+			winner = "You win!"
+			gain = 1
+		} else {
+			winner = "The computer wins!"
+			gain = 0
+		}
+		//alert("You show "+humanChoice+" and the computer shows "+computerChoice+". "+winner+"!")
+		$("#game #winner").html(winner)
+
+		$("#game #prompt").hide()
+		$("#game #outcome").show()
+
+		incGain(gain)
+	}
+
+	function incGain(inc) {
+		gains += inc
+		gainsSpan.html(gains)
+	}
+
+	function incRoundCount(inc) {
+		roundCount += inc
+		roundCountSpan.html(roundCount)
+	}
+
+	// returns a boolean value that says whether we are going to play another round.
+	function playAnotherRound() {
+		if (tutorial) {
+			return (roundCount < maxRounds)
+		} else {
+			return Math.random() < 1-stopProb
+		}
+	}
+
+	$("button#next").click(function() {
+		if (playAnotherRound()) {
+			incRoundCount(1)
+			$("#game #prompt").show()
+			$("#game #outcome").hide()
+		} else {
+			if (tutorial) {
+				$(".page").hide(); $("#deal").show()
+			} else {
+				$(".page").hide(); $("#end").show()
+			}
+		}
+	})
+
+	$("#dealYes").click(function() {
+		deal = true
+		startRealGame()
+	})
+
+	$("#dealNo").click(function() {
+		deal = false
+		startRealGame()
+	})
+
+});
+</script>
+
+
+<!-- p style='border-top:1px solid; margin-top:10em; font-size:10px'><a href='https://github.com/erelsgl/fairness-experiments/tree/master/cake'>code</a></p -->
+</body>
+</html>
